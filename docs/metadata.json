@@ -1,0 +1,563 @@
+{
+  "generated": "2026-08-23T07:34:37.159Z",
+  "pages": [
+    {
+      "title": "پیش‌گفتار",
+      "url": "https://developers.wallex.ir/docs/",
+      "file": "markdown/index.md"
+    },
+    {
+      "title": "ساخت API-Key",
+      "url": "https://developers.wallex.ir/docs/create-api-key",
+      "file": "markdown/create-api-key.md"
+    },
+    {
+      "title": "مقدمه",
+      "url": "https://developers.wallex.ir/docs/basic-services",
+      "file": "markdown/basic-services.md"
+    },
+    {
+      "title": "کیف‌پول حساب اصلی",
+      "url": "https://developers.wallex.ir/docs/basic-services-main-wallet",
+      "file": "markdown/basic-services-main-wallet.md"
+    },
+    {
+      "title": "کندل‌ها",
+      "url": "https://developers.wallex.ir/docs/basic-services-candles",
+      "file": "markdown/basic-services-candles.md"
+    },
+    {
+      "title": "مارکت‌ها",
+      "url": "https://developers.wallex.ir/docs/basic-services-markets",
+      "file": "markdown/basic-services-markets.md"
+    },
+    {
+      "title": "عمق بازار",
+      "url": "https://developers.wallex.ir/docs/basic-services-depth",
+      "file": "markdown/basic-services-depth.md"
+    },
+    {
+      "title": "لیست معاملات",
+      "url": "https://developers.wallex.ir/docs/basic-services-latest-trades",
+      "file": "markdown/basic-services-latest-trades.md"
+    },
+    {
+      "title": "کارمزد حساب کاربری",
+      "url": "https://developers.wallex.ir/docs/basic-services-account-fee",
+      "file": "markdown/basic-services-account-fee.md"
+    },
+    {
+      "title": "اضافه کردن شماره شبا بانکی",
+      "url": "https://developers.wallex.ir/docs/basic-services-add-iban",
+      "file": "markdown/basic-services-add-iban.md"
+    },
+    {
+      "title": "دریافت شماره‌های شبا بانکی",
+      "url": "https://developers.wallex.ir/docs/basic-services-iban-numbers",
+      "file": "markdown/basic-services-iban-numbers.md"
+    },
+    {
+      "title": "دریافت کارت‌های بانکی",
+      "url": "https://developers.wallex.ir/docs/basic-services-card-numbers",
+      "file": "markdown/basic-services-card-numbers.md"
+    },
+    {
+      "title": "ثبت درخواست برداشت تومان",
+      "url": "https://developers.wallex.ir/docs/basic-services-withdraw-toman",
+      "file": "markdown/basic-services-withdraw-toman.md"
+    },
+    {
+      "title": "دریافت آدرس کیف‌پول رمزارز",
+      "url": "https://developers.wallex.ir/docs/basic-services-coin-wallets",
+      "file": "markdown/basic-services-coin-wallets.md"
+    },
+    {
+      "title": "دریافت آدرس کیف‌پول کاربر برای نماد مشخص",
+      "url": "https://developers.wallex.ir/docs/generated/get-account-wallet-by-symbol",
+      "file": "markdown/generated-get-account-wallet-by-symbol.md"
+    },
+    {
+      "title": "افزودن شماره شبا جدید به حساب",
+      "url": "https://developers.wallex.ir/docs/generated/add-account-iban",
+      "file": "markdown/generated-add-account-iban.md"
+    },
+    {
+      "title": "دریافت لیست شماره شباهای حساب",
+      "url": "https://developers.wallex.ir/docs/generated/get-account-ibans",
+      "file": "markdown/generated-get-account-ibans.md"
+    },
+    {
+      "title": "درخواست برداشت وجه از حساب",
+      "url": "https://developers.wallex.ir/docs/generated/create-money-withdrawal",
+      "file": "markdown/generated-create-money-withdrawal.md"
+    },
+    {
+      "title": "دریافت شماره کارت‌های بانکی حساب",
+      "url": "https://developers.wallex.ir/docs/generated/get-account-card-numbers",
+      "file": "markdown/generated-get-account-card-numbers.md"
+    },
+    {
+      "title": "دریافت کارمزدهای حساب",
+      "url": "https://developers.wallex.ir/docs/generated/get-account-fees",
+      "file": "markdown/generated-get-account-fees.md"
+    },
+    {
+      "title": "دریافت معاملات اخیر",
+      "url": "https://developers.wallex.ir/docs/generated/get-latest-trades",
+      "file": "markdown/generated-get-latest-trades.md"
+    },
+    {
+      "title": "Get all markets",
+      "url": "https://developers.wallex.ir/docs/generated/get-markets",
+      "file": "markdown/generated-get-markets.md"
+    },
+    {
+      "title": "دریافت عمق بازار",
+      "url": "https://developers.wallex.ir/docs/generated/get-market-depth",
+      "file": "markdown/generated-get-market-depth.md"
+    },
+    {
+      "title": "Get account balances",
+      "url": "https://developers.wallex.ir/docs/generated/get-account-balances",
+      "file": "markdown/generated-get-account-balances.md"
+    },
+    {
+      "title": "Get historical market data (candles)",
+      "url": "https://developers.wallex.ir/docs/generated/candle-history",
+      "file": "markdown/generated-candle-history.md"
+    },
+    {
+      "title": "معامله اسپات چیست؟",
+      "url": "https://developers.wallex.ir/docs/spot-intro",
+      "file": "markdown/spot-intro.md"
+    },
+    {
+      "title": "اصطلاحات معامله اسپات",
+      "url": "https://developers.wallex.ir/docs/spot-types",
+      "file": "markdown/spot-types.md"
+    },
+    {
+      "title": "مارکت‌های فعال در معامله اسپات",
+      "url": "https://developers.wallex.ir/docs/spot-active-markets",
+      "file": "markdown/spot-active-markets.md"
+    },
+    {
+      "title": "ثبت سفارش اسپات",
+      "url": "https://developers.wallex.ir/docs/spot-create-order",
+      "file": "markdown/spot-create-order.md"
+    },
+    {
+      "title": "لغو سفارش",
+      "url": "https://developers.wallex.ir/docs/spot-cancel-order",
+      "file": "markdown/spot-cancel-order.md"
+    },
+    {
+      "title": "دریافت جزئیات سفارش",
+      "url": "https://developers.wallex.ir/docs/spot-single-order-detail",
+      "file": "markdown/spot-single-order-detail.md"
+    },
+    {
+      "title": "لیست تمامی سفارشات",
+      "url": "https://developers.wallex.ir/docs/spot-order-list",
+      "file": "markdown/spot-order-list.md"
+    },
+    {
+      "title": "لیست سفارشات فعال",
+      "url": "https://developers.wallex.ir/docs/spot-active-orders",
+      "file": "markdown/spot-active-orders.md"
+    },
+    {
+      "title": "Get all markets depth",
+      "url": "https://developers.wallex.ir/docs/generated/get-depth",
+      "file": "markdown/generated-get-depth.md"
+    },
+    {
+      "title": "List active orders",
+      "url": "https://developers.wallex.ir/docs/generated/get-open-order",
+      "file": "markdown/generated-get-open-order.md"
+    },
+    {
+      "title": "List margin orders",
+      "url": "https://developers.wallex.ir/docs/generated/get-orders",
+      "file": "markdown/generated-get-orders.md"
+    },
+    {
+      "title": "Submit a new trading order",
+      "url": "https://developers.wallex.ir/docs/generated/post-account-orders",
+      "file": "markdown/generated-post-account-orders.md"
+    },
+    {
+      "title": "Cancel an existing order",
+      "url": "https://developers.wallex.ir/docs/generated/delete-account-orders",
+      "file": "markdown/generated-delete-account-orders.md"
+    },
+    {
+      "title": "Get order details",
+      "url": "https://developers.wallex.ir/docs/generated/get-orders-client",
+      "file": "markdown/generated-get-orders-client.md"
+    },
+    {
+      "title": "Cancel an order by path parameter",
+      "url": "https://developers.wallex.ir/docs/generated/delete-orders-client",
+      "file": "markdown/generated-delete-orders-client.md"
+    },
+    {
+      "title": "معامله تعهدی چیست؟",
+      "url": "https://developers.wallex.ir/docs/margin-intro",
+      "file": "markdown/margin-intro.md"
+    },
+    {
+      "title": "اصطلاحات معامله تعهدی",
+      "url": "https://developers.wallex.ir/docs/margin-types",
+      "file": "markdown/margin-types.md"
+    },
+    {
+      "title": "مارکت‌های فعال در معامله تعهدی",
+      "url": "https://developers.wallex.ir/docs/margin-active-markets",
+      "file": "markdown/margin-active-markets.md"
+    },
+    {
+      "title": "محاسبه وثیقه",
+      "url": "https://developers.wallex.ir/docs/margin-calculate-loan",
+      "file": "markdown/margin-calculate-loan.md"
+    },
+    {
+      "title": "اطلاعات کامل موقعیت قبل باز شدن",
+      "url": "https://developers.wallex.ir/docs/margin-dry-run",
+      "file": "markdown/margin-dry-run.md"
+    },
+    {
+      "title": "باز کردن موقعیت تعهدی",
+      "url": "https://developers.wallex.ir/docs/margin-open-position",
+      "file": "markdown/margin-open-position.md"
+    },
+    {
+      "title": "دریافت موقعیت‌های تعهدی",
+      "url": "https://developers.wallex.ir/docs/margin-get-positions",
+      "file": "markdown/margin-get-positions.md"
+    },
+    {
+      "title": "ویرایش وثیقه موقعیت تعهدی",
+      "url": "https://developers.wallex.ir/docs/margin-edit-collateral",
+      "file": "markdown/margin-edit-collateral.md"
+    },
+    {
+      "title": "ویرایش حد سود و ضرر",
+      "url": "https://developers.wallex.ir/docs/margin-sltp-edit",
+      "file": "markdown/margin-sltp-edit.md"
+    },
+    {
+      "title": "بستن موقعیت",
+      "url": "https://developers.wallex.ir/docs/margin-close-position",
+      "file": "markdown/margin-close-position.md"
+    },
+    {
+      "title": "List margin positions",
+      "url": "https://developers.wallex.ir/docs/generated/get-positions",
+      "file": "markdown/generated-get-positions.md"
+    },
+    {
+      "title": "Open a margin position",
+      "url": "https://developers.wallex.ir/docs/generated/open-position",
+      "file": "markdown/generated-open-position.md"
+    },
+    {
+      "title": "Get a margin position",
+      "url": "https://developers.wallex.ir/docs/generated/get-position-id",
+      "file": "markdown/generated-get-position-id.md"
+    },
+    {
+      "title": "Close a margin position",
+      "url": "https://developers.wallex.ir/docs/generated/close-position-id",
+      "file": "markdown/generated-close-position-id.md"
+    },
+    {
+      "title": "Update margin positions collateral",
+      "url": "https://developers.wallex.ir/docs/generated/edit-colateral",
+      "file": "markdown/generated-edit-colateral.md"
+    },
+    {
+      "title": "Calculate",
+      "url": "https://developers.wallex.ir/docs/generated/profit-position-id",
+      "file": "markdown/generated-profit-position-id.md"
+    },
+    {
+      "title": "Update stop-loss and take-profit prices",
+      "url": "https://developers.wallex.ir/docs/generated/edit-sltp",
+      "file": "markdown/generated-edit-sltp.md"
+    },
+    {
+      "title": "calculate min, max Collateral and loan",
+      "url": "https://developers.wallex.ir/docs/generated/calculate-loan",
+      "file": "markdown/generated-calculate-loan.md"
+    },
+    {
+      "title": "info a margin position before creation",
+      "url": "https://developers.wallex.ir/docs/generated/detailed-information",
+      "file": "markdown/generated-detailed-information.md"
+    },
+    {
+      "title": "Positions Ratio of long and short",
+      "url": "https://developers.wallex.ir/docs/generated/public-ratio",
+      "file": "markdown/generated-public-ratio.md"
+    },
+    {
+      "title": "margin trade user levels",
+      "url": "https://developers.wallex.ir/docs/generated/get-levels",
+      "file": "markdown/generated-get-levels.md"
+    },
+    {
+      "title": "margin trade user levels",
+      "url": "https://developers.wallex.ir/docs/generated/get-levels-market",
+      "file": "markdown/generated-get-levels-market.md"
+    },
+    {
+      "title": "User PNL",
+      "url": "https://developers.wallex.ir/docs/generated/get-pnl",
+      "file": "markdown/generated-get-pnl.md"
+    },
+    {
+      "title": "اعتبار معاملاتی چیست؟",
+      "url": "https://developers.wallex.ir/docs/trade-credit-intro",
+      "file": "markdown/trade-credit-intro.md"
+    },
+    {
+      "title": "اصطلاحات اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-types",
+      "file": "markdown/trade-credit-types.md"
+    },
+    {
+      "title": "پکیج‌های فعال اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-active-packages",
+      "file": "markdown/trade-credit-active-packages.md"
+    },
+    {
+      "title": "دریافت جزیيات پکیج و لیست بازارهای غیر فعال",
+      "url": "https://developers.wallex.ir/docs/trade-credit-package-details",
+      "file": "markdown/trade-credit-package-details.md"
+    },
+    {
+      "title": "بررسی شرایط کاربر برای دریافت اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-condition-check",
+      "file": "markdown/trade-credit-condition-check.md"
+    },
+    {
+      "title": "فعال کردن پکیج اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-activate-sub-account",
+      "file": "markdown/trade-credit-activate-sub-account.md"
+    },
+    {
+      "title": "اتصال کیف پول اصلی به اکانت اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-connect-wallet",
+      "file": "markdown/trade-credit-connect-wallet.md"
+    },
+    {
+      "title": "قطع اتصال کیف پول اصلی از اکانت اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-disconnect-wallet",
+      "file": "markdown/trade-credit-disconnect-wallet.md"
+    },
+    {
+      "title": "بستن اکانت اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-close-sub-account",
+      "file": "markdown/trade-credit-close-sub-account.md"
+    },
+    {
+      "title": "دریافت تاریخچه طرح های اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-sub-account-history",
+      "file": "markdown/trade-credit-sub-account-history.md"
+    },
+    {
+      "title": "لیست حساب های اعتبار معاملاتی",
+      "url": "https://developers.wallex.ir/docs/trade-credit-active-sub-account-list",
+      "file": "markdown/trade-credit-active-sub-account-list.md"
+    },
+    {
+      "title": "Active Sub Accounts List",
+      "url": "https://developers.wallex.ir/docs/generated/active-sub-accounts-list",
+      "file": "markdown/generated-active-sub-accounts-list.md"
+    },
+    {
+      "title": "List Sub Account Transfers",
+      "url": "https://developers.wallex.ir/docs/generated/sub-account-transfer",
+      "file": "markdown/generated-sub-account-transfer.md"
+    },
+    {
+      "title": "Create Transfer To Sub Account",
+      "url": "https://developers.wallex.ir/docs/generated/create-transfer-to-sub-account",
+      "file": "markdown/generated-create-transfer-to-sub-account.md"
+    },
+    {
+      "title": "Sub Account Balances Details",
+      "url": "https://developers.wallex.ir/docs/generated/sub-account-balances-details",
+      "file": "markdown/generated-sub-account-balances-details.md"
+    },
+    {
+      "title": "Prop Packages List",
+      "url": "https://developers.wallex.ir/docs/generated/prop-packages-list",
+      "file": "markdown/generated-prop-packages-list.md"
+    },
+    {
+      "title": "Prop Package Details",
+      "url": "https://developers.wallex.ir/docs/generated/prop-package-details",
+      "file": "markdown/generated-prop-package-details.md"
+    },
+    {
+      "title": "User Package History List",
+      "url": "https://developers.wallex.ir/docs/generated/user-package-history-list",
+      "file": "markdown/generated-user-package-history-list.md"
+    },
+    {
+      "title": "User Package History Details",
+      "url": "https://developers.wallex.ir/docs/generated/user-package-history-details",
+      "file": "markdown/generated-user-package-history-details.md"
+    },
+    {
+      "title": "Active User Packages Overview",
+      "url": "https://developers.wallex.ir/docs/generated/active-user-packages-overview",
+      "file": "markdown/generated-active-user-packages-overview.md"
+    },
+    {
+      "title": "Active User Package Details",
+      "url": "https://developers.wallex.ir/docs/generated/active-user-package-details",
+      "file": "markdown/generated-active-user-package-details.md"
+    },
+    {
+      "title": "Check Prop Package Availability",
+      "url": "https://developers.wallex.ir/docs/generated/check-prop-package-availability",
+      "file": "markdown/generated-check-prop-package-availability.md"
+    },
+    {
+      "title": "Activate User Package",
+      "url": "https://developers.wallex.ir/docs/generated/activate-user-package",
+      "file": "markdown/generated-activate-user-package.md"
+    },
+    {
+      "title": "Cancel User Package",
+      "url": "https://developers.wallex.ir/docs/generated/cancel-user-package",
+      "file": "markdown/generated-cancel-user-package.md"
+    },
+    {
+      "title": "Enable Connect To Wallet",
+      "url": "https://developers.wallex.ir/docs/generated/enable-connect-to-wallet",
+      "file": "markdown/generated-enable-connect-to-wallet.md"
+    },
+    {
+      "title": "Disable Connect To Wallet",
+      "url": "https://developers.wallex.ir/docs/generated/disable-connect-to-wallet",
+      "file": "markdown/generated-disable-connect-to-wallet.md"
+    },
+    {
+      "title": "Enable User Package Renew",
+      "url": "https://developers.wallex.ir/docs/generated/enable-user-package-renew",
+      "file": "markdown/generated-enable-user-package-renew.md"
+    },
+    {
+      "title": "خرید و فروش در بازار معاملاتی آنی چیست ؟",
+      "url": "https://developers.wallex.ir/docs/otc-intro",
+      "file": "markdown/otc-intro.md"
+    },
+    {
+      "title": "بازارهای فعال در معاملات آنی",
+      "url": "https://developers.wallex.ir/docs/otc-markets",
+      "file": "markdown/otc-markets.md"
+    },
+    {
+      "title": "دریافت قیمت ها در بازار آنی",
+      "url": "https://developers.wallex.ir/docs/otc-price",
+      "file": "markdown/otc-price.md"
+    },
+    {
+      "title": "ثبت سفارش در بازار آنی",
+      "url": "https://developers.wallex.ir/docs/otc-create-order",
+      "file": "markdown/otc-create-order.md"
+    },
+    {
+      "title": "get otc markets",
+      "url": "https://developers.wallex.ir/docs/generated/get-otc-markets",
+      "file": "markdown/generated-get-otc-markets.md"
+    },
+    {
+      "title": "get otc price",
+      "url": "https://developers.wallex.ir/docs/generated/get-otc-price",
+      "file": "markdown/generated-get-otc-price.md"
+    },
+    {
+      "title": "create otc trade",
+      "url": "https://developers.wallex.ir/docs/generated/place-easy-trade-order",
+      "file": "markdown/generated-place-easy-trade-order.md"
+    },
+    {
+      "title": "سوکت های والکس",
+      "url": "https://developers.wallex.ir/docs/socket-intro",
+      "file": "markdown/socket-intro.md"
+    },
+    {
+      "title": "دریافت عمق بازار خرید",
+      "url": "https://developers.wallex.ir/docs/socket-buy-depth",
+      "file": "markdown/socket-buy-depth.md"
+    },
+    {
+      "title": "دریافت عمق بازار فروش",
+      "url": "https://developers.wallex.ir/docs/socket-sell-depth",
+      "file": "markdown/socket-sell-depth.md"
+    },
+    {
+      "title": "دریافت معاملات انجام‌شده",
+      "url": "https://developers.wallex.ir/docs/socket-trade",
+      "file": "markdown/socket-trade.md"
+    },
+    {
+      "title": "دریافت قیمت لحظه‌ای",
+      "url": "https://developers.wallex.ir/docs/socket-all-price",
+      "file": "markdown/socket-all-price.md"
+    },
+    {
+      "title": "event های خصوصی کاربران",
+      "url": "https://developers.wallex.ir/docs/socket-private-channel",
+      "file": "markdown/socket-private-channel.md"
+    }
+  ],
+  "assets": [
+    {
+      "url": "https://developers.wallex.ir/assets/files/basic-services-89626420b5f06e4d7a2dc9206cdeb192.json",
+      "file": "assets/basic-services-89626420b5f06e4d7a2dc9206cdeb192.json"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/files/spot-b9d06896d1009adc9ebc69b9a5495e7e.json",
+      "file": "assets/spot-b9d06896d1009adc9ebc69b9a5495e7e.json"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/files/margin-c709e1f52cb44387a2e35ffd678c6dfa.json",
+      "file": "assets/margin-c709e1f52cb44387a2e35ffd678c6dfa.json"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/files/trade-credit-ff5c60b5b97b77a5b2c2e4800f07729c.yaml",
+      "file": "assets/trade-credit-ff5c60b5b97b77a5b2c2e4800f07729c.yaml"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/files/otc-8e321a32f4509cbf103b3127bf7c9918.json",
+      "file": "assets/otc-8e321a32f4509cbf103b3127bf7c9918.json"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/images/1-4f6bb8a9886ee0ff55a131bff6b74ddf.png",
+      "file": "assets/1-4f6bb8a9886ee0ff55a131bff6b74ddf.png"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/images/2-c3907a3125922048f4b66e46c72d13a5.png",
+      "file": "assets/2-c3907a3125922048f4b66e46c72d13a5.png"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/images/3-00352c2a8b1fb24238e1bce8f1ef51de.png",
+      "file": "assets/3-00352c2a8b1fb24238e1bce8f1ef51de.png"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/images/4-eb57fb91a5f9e9ff2149a172e17fc370.png",
+      "file": "assets/4-eb57fb91a5f9e9ff2149a172e17fc370.png"
+    },
+    {
+      "url": "https://developers.wallex.ir/assets/images/5-090e764e1d46c4641f26abbb854466a8.png",
+      "file": "assets/5-090e764e1d46c4641f26abbb854466a8.png"
+    }
+  ],
+  "failures": []
+}
