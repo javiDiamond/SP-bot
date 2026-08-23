@@ -1,0 +1,24 @@
+{
+  "name": "@wallex-grid/exchange",
+  "version": "1.0.0",
+  "description": "Wallex Exchange REST and WebSocket client",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "decimal.js": "^10.4.3",
+    "isomorphic-ws": "^5.0.0",
+    "pino": "^9.4.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.5.12",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

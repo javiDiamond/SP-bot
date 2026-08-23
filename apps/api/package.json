@@ -1,0 +1,39 @@
+{
+  "name": "@wallex-grid/api",
+  "version": "1.0.0",
+  "description": "Wallex Grid Bot API Server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/jwt": "^8.0.1",
+    "@fastify/rate-limit": "^9.1.0",
+    "@prisma/client": "^5.22.0",
+    "@wallex-grid/backtester": "workspace:*",
+    "@wallex-grid/exchange": "workspace:*",
+    "@wallex-grid/grid-strategy": "workspace:*",
+    "@wallex/shared": "workspace:*",
+    "bullmq": "^5.12.0",
+    "decimal.js": "^10.4.3",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "ioredis": "^5.4.1",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.2.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}
