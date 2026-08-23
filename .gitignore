@@ -1,45 +1,168 @@
-```
+```gitignore
 # Dependencies
 node_modules/
 .pnpm-store/
+.yarn/
+.yarnrc.yml
+*.lock
 
 # Build outputs
 dist/
 build/
-coverage/
-
-# Environment
-.env
-.env.local
-*.env.*
+public/build/
+.next/
+.nuxt/
+output/
 
 # Logs
 *.log
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-
-# Node.js
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# TypeScript
-*.tsbuildinfo
-.next/
-.nuxt/
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Package manager
-pnpm-lock.yaml
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# TypeScript/JavaScript specific
+*.tsbuildinfo
+.nyc_output/
+coverage/
+lib-cov/
+
+# Runtime data
+.pids
+.logs
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Typescript output
+*.tsbuildinfo
+**/*.js
+!cypress/**/*.js
+**/*.cjs
+!cypress/**/*.cjs
+**/*.mjs
+!cypress/**/*.mjs
+**/*.map
+!cypress/**/*.map
+
+# Next.js
+.next/
+out/
+
+# Nuxt.js
+.nuxt
+dist
+
+# Vue.js
+.vuepress/dist
+static/_nuxt/
+
+# Remix
+*.mjs.CACHED
+*.cjs.CACHED
+
+# Gatsby
+.cache/
+public/
+
+# Docusaurus cache
+.docusaurus
+
+# TSDX
+dist
+
+# Parcel
+.cache
+.dist
+!.d.ts
+
+# Jekyll
+_site
+
+# JSPM
+jspm_packages/
+
+# ESLint cache
+.eslintcache
+
+# Prettier cache
+.prettier-cache
+
+# Rollup
+.node_modules.bak
+
+# Yarn PnP
+.pnp.js
+.pnp.cjs
+
+# Yarn Berry
+.yarn/cache
+.yarn/unplugged
+.yarn/install-state.gz
+.yarn/plugins/@yarnpkg/plugin-*.cjs
+.pnp.*
+
+# Turborepo
+node_modules/.cache/turbo/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Database
+*.db
+*.db-journal
+
+# Process files
+*.pid
+*.seed
+*.pid.lock
+
+# Testing
+coverage/
+.nyc_output/
+.jest/
+.jest-cache/
+jest/
 ```

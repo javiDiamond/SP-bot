@@ -1,6 +1,6 @@
 /**
  * Wallex Grid Bot API Server
- * 
+ *
  * REST API for managing grid bots, viewing data, and controlling trading
  */
 
@@ -8,8 +8,12 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import jwt from '@fastify/jwt';
 import pino from 'pino';
 import { config } from './config.js';
+import { connectDatabase, disconnectDatabase } from './lib/database.js';
+import marketsRoutes from './routes/markets.js';
+import botsRoutes from './routes/bots.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -27,13 +31,24 @@ await fastify.register(cors, {
 });
 
 await fastify.register(helmet, {
-  contentSecurityPolicy: false, // Configure based on your needs
+  contentSecurityPolicy: false,
 });
 
 await fastify.register(rateLimit, {
-  max: 100,
-  timeWindow: '1 minute',
+  max: config.rateLimitMax,
+  timeWindow: config.rateLimitWindowMs,
 });
+
+await fastify.register(jwt, {
+  secret: config.jwtSecret,
+  sign: {
+    expiresIn: '1d',
+  },
+});
+
+// Register routes
+await fastify.register(marketsRoutes, { prefix: '/api/v1/markets' });
+await fastify.register(botsRoutes, { prefix: '/api/v1/bots' });
 
 // Health check
 fastify.get('/health', async () => {
@@ -54,11 +69,25 @@ fastify.get('/api', async () => {
   };
 });
 
+// Graceful shutdown
+const gracefulShutdown = async (signal: string) => {
+  logger.info(`Received ${signal}, shutting down gracefully...`);
+  await disconnectDatabase();
+  await fastify.close();
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 // Start server
 const start = async () => {
   try {
-    await fastify.listen({ port: config.port, host: '0.0.0.0' });
-    logger.info(`Server running at http://0.0.0.0:${config.port}`);
+    // Connect to database
+    await connectDatabase();
+    
+    await fastify.listen({ port: config.port, host: config.host });
+    logger.info(`Server running at http://${config.host}:${config.port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
