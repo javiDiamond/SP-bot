@@ -1,0 +1,41 @@
+```
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.yarnrc.yml
+
+# Build outputs
+dist/
+build/
+.next/
+.nuxt/
+public/dist/
+
+# TypeScript
+*.tsbuildinfo
+.cache/
+
+# Environment variables
+.env.local
+.env.production
+.env.development
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+.nyc_output/
+```
