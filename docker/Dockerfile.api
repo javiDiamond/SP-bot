@@ -1,0 +1,39 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* turbo.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/exchange/package.json ./packages/exchange/
+COPY packages/grid-strategy/package.json ./packages/grid-strategy/
+COPY packages/backtester/package.json ./packages/backtester/
+COPY packages/db/package.json ./packages/db/
+COPY apps/api/package.json ./apps/api/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile || pnpm install
+
+# Copy source code
+COPY packages/shared ./packages/shared
+COPY packages/exchange ./packages/exchange
+COPY packages/grid-strategy ./packages/grid-strategy
+COPY packages/backtester ./packages/backtester
+COPY packages/db ./packages/db
+COPY apps/api ./apps/api
+
+# Build
+RUN pnpm build --filter=@wallex/api...
+
+# Expose port
+EXPOSE 4000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
+
+# Start
+CMD ["sh", "-c", "pnpm db:migrate && pnpm start --filter=@wallex/api"]

@@ -1,0 +1,29 @@
+{
+  "name": "wallex-grid-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Complete Wallex Spot Grid Trading Bot with Dashboard and Backtesting",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:migrate": "pnpm --filter @wallex/db db:migrate",
+    "db:seed": "pnpm --filter @wallex/db db:seed",
+    "db:studio": "pnpm --filter @wallex/db db:studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:build": "docker compose build"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "turbo": "^2.0.0",
+    "prettier": "^3.2.0",
+    "eslint": "^8.57.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

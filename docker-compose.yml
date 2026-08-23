@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wallex_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wallex
+      POSTGRES_PASSWORD: wallex_password
+      POSTGRES_DB: wallex_grid_bot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wallex_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: wallex_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wallex_network
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: wallex_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4000
+      DATABASE_URL: postgresql://wallex:wallex_password@postgres:5432/wallex_grid_bot
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-secure-random-string}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-to-secure-32-char-key}
+      WALLEX_API_BASE_URL: https://api.wallex.ir
+      WALLEX_WS_URL: wss://api.wallex.ir/ws
+      ENABLE_LIVE_TRADING: ${ENABLE_LIVE_TRADING:-false}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - wallex_network
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: wallex_worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://wallex:wallex_password@postgres:5432/wallex_grid_bot
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-secure-random-string}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-to-secure-32-char-key}
+      WALLEX_API_BASE_URL: https://api.wallex.ir
+      WALLEX_WS_URL: wss://api.wallex.ir/ws
+      ENABLE_LIVE_TRADING: ${ENABLE_LIVE_TRADING:-false}
+      STALE_PRICE_TIMEOUT_SECONDS: ${STALE_PRICE_TIMEOUT_SECONDS:-30}
+      REST_POLL_INTERVAL_MS: ${REST_POLL_INTERVAL_MS:-5000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - wallex_network
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    container_name: wallex_web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+    networks:
+      - wallex_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  wallex_network:
+    driver: bridge
