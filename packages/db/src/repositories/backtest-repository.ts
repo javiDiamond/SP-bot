@@ -9,11 +9,10 @@ export class BacktestRepository {
         trades: {
           orderBy: { timestamp: 'asc' },
         },
-        user: true,
       },
     });
   }
-
+  
   async findByUserId(userId: string, options?: {
     limit?: number;
     offset?: number;
@@ -78,7 +77,6 @@ export class BacktestRepository {
       prisma.backtest.findMany({
         where,
         include: {
-          user: true,
           _count: {
             select: {
               trades: true,
@@ -111,13 +109,21 @@ export class BacktestRepository {
     status: string,
     errorMessage?: string
   ): Promise<Backtest> {
+    const updateData: Prisma.BacktestUpdateInput = {
+      status: status as any,
+      completedAt: status === 'COMPLETED' || status === 'FAILED' ? new Date() : undefined,
+    };
+    
+    if (errorMessage && status === 'FAILED') {
+      // Store error message in results JSON since there's no error field
+      const existingBacktest = await this.findById(id);
+      const results = existingBacktest?.results as any || {};
+      updateData.results = { ...results, error: errorMessage };
+    }
+    
     return prisma.backtest.update({
       where: { id },
-      data: {
-        status: status as any,
-        error: errorMessage,
-        completedAt: status === 'COMPLETED' || status === 'FAILED' ? new Date() : undefined,
-      },
+      data: updateData,
     });
   }
 }

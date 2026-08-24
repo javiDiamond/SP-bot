@@ -1,7 +1,7 @@
 {
-  "name": "@wallex-grid/backtester",
+  "name": "@wallex/backtester",
   "version": "1.0.0",
-  "description": "Backtesting engine for grid trading strategies",
+  "description": "Candle-based backtesting engine",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@wallex/shared": "workspace:*",
-    "@wallex-grid/grid-strategy": "workspace:*",
+    "@wallex/grid-strategy": "workspace:*",
     "decimal.js": "^10.4.3",
-    "pino": "^9.4.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

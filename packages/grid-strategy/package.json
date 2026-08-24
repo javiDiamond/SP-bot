@@ -1,7 +1,7 @@
 {
-  "name": "@wallex-grid/grid-strategy",
+  "name": "@wallex/grid-strategy",
   "version": "1.0.0",
-  "description": "Grid trading strategy implementation for Wallex",
+  "description": "Grid trading strategy implementation",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
@@ -11,7 +11,6 @@
   "dependencies": {
     "@wallex/shared": "workspace:*",
     "decimal.js": "^10.4.3",
-    "pino": "^9.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

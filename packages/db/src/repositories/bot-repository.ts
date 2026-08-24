@@ -6,19 +6,24 @@ export class BotRepository {
     return prisma.bot.findUnique({
       where: { id },
       include: {
-        exchangeAccount: true,
-        user: true,
         orders: {
           orderBy: { createdAt: 'desc' },
           take: 50,
         },
         fills: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { timestamp: 'desc' },
           take: 50,
+        },
+        gridLevels: {
+          orderBy: { levelIndex: 'asc' },
         },
         pnlSnapshots: {
           orderBy: { timestamp: 'desc' },
           take: 100,
+        },
+        eventLogs: {
+          orderBy: { createdAt: 'desc' },
+          take: 50,
         },
       },
     });
@@ -28,22 +33,15 @@ export class BotRepository {
     return prisma.bot.findMany({
       where: { userId },
       include: {
-        exchangeAccount: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async findActiveBots(): Promise<Bot[]> {
-    return prisma.bot.findMany({
-      where: {
-        status: {
-          in: ['RUNNING', 'STARTING'] as any[],
+        _count: {
+          select: {
+            orders: true,
+            fills: true,
+            gridLevels: true,
+          },
         },
       },
-      include: {
-        exchangeAccount: true,
-      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -60,6 +58,34 @@ export class BotRepository {
     });
   }
 
+  async updateStatus(
+    id: string,
+    status: string,
+    errorMessage?: string
+  ): Promise<Bot> {
+    const updateData: Prisma.BotUpdateInput = {
+      status: status as any,
+    };
+
+    if (status === 'RUNNING' && !errorMessage) {
+      updateData.startedAt = new Date();
+    } else if (status === 'STOPPED' || status === 'ERROR' || status === 'KILLED') {
+      updateData.stoppedAt = new Date();
+    }
+
+    if (errorMessage && status === 'ERROR') {
+      // Store error in runtimeState JSON
+      const existingBot = await this.findById(id);
+      const runtimeState = (existingBot?.runtimeState as any) || {};
+      updateData.runtimeState = { ...runtimeState, lastError: errorMessage };
+    }
+
+    return prisma.bot.update({
+      where: { id },
+      data: updateData,
+    });
+  }
+
   async delete(id: string): Promise<void> {
     await prisma.bot.delete({
       where: { id },
@@ -68,25 +94,38 @@ export class BotRepository {
 
   async list(options?: {
     userId?: string;
-    status?: string;
     symbol?: string;
-    tradingMode?: string;
+    status?: string;
+    mode?: string;
     limit?: number;
     offset?: number;
   }): Promise<{ bots: Bot[]; total: number }> {
-    const { userId, status, symbol, tradingMode, limit = 50, offset = 0 } = options || {};
+    const {
+      userId,
+      symbol,
+      status,
+      mode,
+      limit = 50,
+      offset = 0,
+    } = options || {};
 
     const where: Prisma.BotWhereInput = {};
     if (userId) where.userId = userId;
-    if (status) where.status = status as any;
     if (symbol) where.symbol = symbol;
-    if (tradingMode) where.tradingMode = tradingMode as any;
+    if (status) where.status = status as any;
+    if (mode) where.mode = mode as any;
 
     const [bots, total] = await Promise.all([
       prisma.bot.findMany({
         where,
         include: {
-          exchangeAccount: true,
+          _count: {
+            select: {
+              orders: true,
+              fills: true,
+              gridLevels: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: offset,
@@ -101,58 +140,64 @@ export class BotRepository {
   async count(options?: {
     userId?: string;
     status?: string;
+    mode?: string;
   }): Promise<number> {
-    const { userId, status } = options || {};
+    const { userId, status, mode } = options || {};
     const where: Prisma.BotWhereInput = {};
     if (userId) where.userId = userId;
     if (status) where.status = status as any;
+    if (mode) where.mode = mode as any;
     return prisma.bot.count({ where });
   }
 
-  async updateStatus(
-    id: string,
-    status: string,
-    errorMessage?: string
-  ): Promise<Bot> {
-    return prisma.bot.update({
-      where: { id },
-      data: {
-        status: status as any,
-        lastError: errorMessage,
-        lastActivityAt: new Date(),
+  async findActiveBots(): Promise<Bot[]> {
+    return prisma.bot.findMany({
+      where: {
+        status: {
+          in: ['RUNNING', 'STARTING', 'PAUSING'] as any[],
+        },
+      },
+      include: {
+        gridLevels: true,
+        eventLogs: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
       },
     });
   }
 
-  async incrementMetrics(
+  async incrementStats(
     id: string,
-    metrics: {
+    stats: {
       totalBuys?: number;
       totalSells?: number;
       totalGridCycles?: number;
-      realizedPnL?: number;
-      totalFeesPaid?: number;
+      realizedPnL?: string;
+      totalFeesPaid?: string;
     }
   ): Promise<Bot> {
+    const updateData: Prisma.BotUpdateInput = {};
+
+    if (stats.totalBuys !== undefined) {
+      updateData.totalBuys = { increment: stats.totalBuys };
+    }
+    if (stats.totalSells !== undefined) {
+      updateData.totalSells = { increment: stats.totalSells };
+    }
+    if (stats.totalGridCycles !== undefined) {
+      updateData.totalGridCycles = { increment: stats.totalGridCycles };
+    }
+    if (stats.realizedPnL !== undefined) {
+      updateData.realizedPnL = { increment: parseFloat(stats.realizedPnL) };
+    }
+    if (stats.totalFeesPaid !== undefined) {
+      updateData.totalFeesPaid = { increment: parseFloat(stats.totalFeesPaid) };
+    }
+
     return prisma.bot.update({
       where: { id },
-      data: {
-        totalBuys: {
-          increment: metrics.totalBuys ?? 0,
-        },
-        totalSells: {
-          increment: metrics.totalSells ?? 0,
-        },
-        totalGridCycles: {
-          increment: metrics.totalGridCycles ?? 0,
-        },
-        realizedPnL: {
-          increment: metrics.realizedPnL ?? 0,
-        },
-        totalFeesPaid: {
-          increment: metrics.totalFeesPaid ?? 0,
-        },
-      },
+      data: updateData,
     });
   }
 }

@@ -1,75 +1,61 @@
 import { describe, it, expect } from 'vitest';
-import Decimal from 'decimal.js';
-import {
-  calculateArithmeticGridLevels,
-  calculateGeometricGridLevels,
-  roundToPrecision,
-  validateMinProfitAfterFees,
-  generateClientOrderId,
-} from './index';
+import { DecimalUtils } from './decimal-utils';
+import { GridMath } from './grid-math';
+import { GridType } from './types';
 
-describe('Grid Math', () => {
-  it('should calculate arithmetic grid levels correctly', () => {
-    const levels = calculateArithmeticGridLevels(100, 200, 5, 2);
-    expect(levels).toHaveLength(6); // 5 grids = 6 levels
-    expect(levels[0]).toBe('100.00');
-    expect(levels[5]).toBe('200.00');
+describe('DecimalUtils', () => {
+  it('should add two numbers', () => {
+    expect(DecimalUtils.add('10.5', '20.3')).toBe('30.8');
   });
 
-  it('should calculate geometric grid levels correctly', () => {
-    const levels = calculateGeometricGridLevels(100, 200, 5, 4);
-    expect(levels).toHaveLength(6);
-    expect(parseFloat(levels[0])).toBeCloseTo(100, 2);
-    expect(parseFloat(levels[5])).toBeCloseTo(200, 2);
+  it('should subtract two numbers', () => {
+    expect(DecimalUtils.sub('30.8', '10.5')).toBe('20.3');
   });
 
-  it('should round to precision correctly', () => {
-    expect(roundToPrecision(123.456789, 2)).toBe('123.46');
-    expect(roundToPrecision(123.456789, 4)).toBe('123.4568');
-    expect(roundToPrecision(123.456789, 0)).toBe('123');
+  it('should multiply two numbers', () => {
+    expect(DecimalUtils.mul('10', '5.5')).toBe('55');
   });
 
-  it('should validate minimum profit after fees', () => {
-    const result = validateMinProfitAfterFees(
-      100,
-      102,
-      0.001,
-      0.001,
-      10
-    );
-    
-    // 2% spread, 0.2% fees, should have ~1.8% profit (180 bps)
-    expect(result.valid).toBe(true);
-    expect(result.expectedProfitBps).toBeGreaterThan(100);
+  it('should divide two numbers', () => {
+    expect(DecimalUtils.div('100', '4', 2)).toBe('25.00');
   });
 
-  it('should reject insufficient profit after fees', () => {
-    const result = validateMinProfitAfterFees(
-      100,
-      100.5,
-      0.001,
-      0.001,
-      50 // 50 bps minimum
-    );
-    
-    // 0.5% spread, 0.2% fees = 0.3% profit (30 bps), less than 50 bps required
-    expect(result.valid).toBe(false);
+  it('should round to precision', () => {
+    expect(DecimalUtils.round('10.123456789', 4)).toBe('10.1235');
   });
 });
 
-describe('Client Order ID Generation', () => {
-  it('should generate valid client order IDs', () => {
-    const orderId = generateClientOrderId('BOT1', 'BUY', 3);
-    expect(orderId).toMatch(/^GB_BOT1_B_L3_[A-Z0-9]+$/);
-    expect(orderId.length).toBeLessThanOrEqual(32);
+describe('GridMath', () => {
+  it('should generate arithmetic grid levels', () => {
+    const config = {
+      gridType: GridType.ARITHMETIC,
+      lowerPrice: '100',
+      upperPrice: '200',
+      gridCount: 5,
+      inventoryMode: 'EXISTING_ONLY' as const,
+      makerOnly: true,
+      minProfitAfterFeesBps: 10,
+      onRangeExit: 'PAUSE_KEEP_ORDERS' as const,
+      autoRecenter: false,
+      allowMarketOrders: false,
+    };
+
+    const levels = GridMath.generateGridLevels(config, 2);
+    expect(levels).toHaveLength(6); // gridCount + 1
+    expect(levels[0].price).toBe('100.00');
+    expect(levels[5].price).toBe('200.00');
   });
 
-  it('should generate unique IDs for different parameters', () => {
-    const id1 = generateClientOrderId('BOT1', 'BUY', 1, 'ABC');
-    const id2 = generateClientOrderId('BOT1', 'SELL', 1, 'ABC');
-    const id3 = generateClientOrderId('BOT2', 'BUY', 1, 'ABC');
-    
-    expect(id1).not.toBe(id2);
-    expect(id1).not.toBe(id3);
+  it('should calculate grid profit', () => {
+    const result = GridMath.calculateGridProfit(
+      '100',
+      '101',
+      '0.001', // 0.1% maker fee
+      '0.001'  // 0.1% taker fee
+    );
+
+    expect(parseFloat(result.grossProfitPercent)).toBeCloseTo(1.0, 2);
+    expect(parseFloat(result.netProfitPercent)).toBeCloseTo(0.6, 2);
+    expect(result.isProfitable).toBe(true);
   });
 });
