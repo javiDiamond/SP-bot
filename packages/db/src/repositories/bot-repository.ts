@@ -6,8 +6,6 @@ export class BotRepository {
     return prisma.bot.findUnique({
       where: { id },
       include: {
-        gridConfig: true,
-        runtimeState: true,
         exchangeAccount: true,
         user: true,
         orders: {
@@ -30,8 +28,6 @@ export class BotRepository {
     return prisma.bot.findMany({
       where: { userId },
       include: {
-        gridConfig: true,
-        runtimeState: true,
         exchangeAccount: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -41,14 +37,11 @@ export class BotRepository {
   async findActiveBots(): Promise<Bot[]> {
     return prisma.bot.findMany({
       where: {
-        enabled: true,
         status: {
-          in: ['RUNNING', 'STARTING'],
+          in: ['RUNNING', 'STARTING'] as any[],
         },
       },
       include: {
-        gridConfig: true,
-        runtimeState: true,
         exchangeAccount: true,
       },
     });
@@ -85,16 +78,14 @@ export class BotRepository {
 
     const where: Prisma.BotWhereInput = {};
     if (userId) where.userId = userId;
-    if (status) where.status = status;
+    if (status) where.status = status as any;
     if (symbol) where.symbol = symbol;
-    if (tradingMode) where.tradingMode = tradingMode;
+    if (tradingMode) where.tradingMode = tradingMode as any;
 
     const [bots, total] = await Promise.all([
       prisma.bot.findMany({
         where,
         include: {
-          gridConfig: true,
-          runtimeState: true,
           exchangeAccount: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -114,7 +105,7 @@ export class BotRepository {
     const { userId, status } = options || {};
     const where: Prisma.BotWhereInput = {};
     if (userId) where.userId = userId;
-    if (status) where.status = status;
+    if (status) where.status = status as any;
     return prisma.bot.count({ where });
   }
 
@@ -126,7 +117,7 @@ export class BotRepository {
     return prisma.bot.update({
       where: { id },
       data: {
-        status,
+        status: status as any,
         lastError: errorMessage,
         lastActivityAt: new Date(),
       },
@@ -136,22 +127,30 @@ export class BotRepository {
   async incrementMetrics(
     id: string,
     metrics: {
-      totalTrades?: number;
-      realizedProfit?: number;
-      feesPaid?: number;
+      totalBuys?: number;
+      totalSells?: number;
+      totalGridCycles?: number;
+      realizedPnL?: number;
+      totalFeesPaid?: number;
     }
   ): Promise<Bot> {
     return prisma.bot.update({
       where: { id },
       data: {
-        totalTrades: {
-          increment: metrics.totalTrades ?? 0,
+        totalBuys: {
+          increment: metrics.totalBuys ?? 0,
         },
-        realizedProfit: {
-          increment: metrics.realizedProfit ?? 0,
+        totalSells: {
+          increment: metrics.totalSells ?? 0,
         },
-        feesPaid: {
-          increment: metrics.feesPaid ?? 0,
+        totalGridCycles: {
+          increment: metrics.totalGridCycles ?? 0,
+        },
+        realizedPnL: {
+          increment: metrics.realizedPnL ?? 0,
+        },
+        totalFeesPaid: {
+          increment: metrics.totalFeesPaid ?? 0,
         },
       },
     });

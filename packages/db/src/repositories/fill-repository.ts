@@ -15,7 +15,7 @@ export class FillRepository {
   async findByOrderId(orderId: string): Promise<Fill[]> {
     return prisma.fill.findMany({
       where: { orderId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { timestamp: 'desc' },
     });
   }
 
@@ -27,7 +27,7 @@ export class FillRepository {
 
     return prisma.fill.findMany({
       where: { botId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { timestamp: 'desc' },
       skip: offset,
       take: limit,
     });
@@ -56,8 +56,6 @@ export class FillRepository {
     botId?: string;
     orderId?: string;
     userId?: string;
-    symbol?: string;
-    side?: string;
     limit?: number;
     offset?: number;
   }): Promise<{ fills: Fill[]; total: number }> {
@@ -65,8 +63,6 @@ export class FillRepository {
       botId,
       orderId,
       userId,
-      symbol,
-      side,
       limit = 100,
       offset = 0,
     } = options || {};
@@ -74,8 +70,6 @@ export class FillRepository {
     const where: Prisma.FillWhereInput = {};
     if (botId) where.botId = botId;
     if (orderId) where.orderId = orderId;
-    if (symbol) where.symbol = symbol;
-    if (side) where.side = side;
     if (userId) {
       where.bot = {
         userId,
@@ -89,7 +83,7 @@ export class FillRepository {
           order: true,
           bot: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { timestamp: 'desc' },
         skip: offset,
         take: limit,
       }),
@@ -116,27 +110,33 @@ export class FillRepository {
   }> {
     const [buyResult, sellResult] = await Promise.all([
       prisma.fill.aggregate({
-        where: { botId, side: 'BUY' },
+        where: { 
+          botId, 
+          isBuyer: true 
+        },
         _sum: { quantity: true },
       }),
       prisma.fill.aggregate({
-        where: { botId, side: 'SELL' },
+        where: { 
+          botId, 
+          isBuyer: false 
+        },
         _sum: { quantity: true },
       }),
     ]);
 
     return {
-      buyVolume: Number(buyResult._sum.quantity) || 0,
-      sellVolume: Number(sellResult._sum.quantity) || 0,
+      buyVolume: Number(buyResult._sum?.quantity ?? 0),
+      sellVolume: Number(sellResult._sum?.quantity ?? 0),
     };
   }
 
   async getTotalFeesByBotId(botId: string): Promise<number> {
     const result = await prisma.fill.aggregate({
       where: { botId },
-      _sum: { feeAmount: true },
+      _sum: { fee: true },
     });
-    return Number(result._sum.feeAmount) || 0;
+    return Number(result._sum?.fee ?? 0);
   }
 }
 
