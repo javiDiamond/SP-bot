@@ -2,7 +2,9 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  output        = "../generated"
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -41,7 +43,7 @@ enum UserRole {
 model ExchangeAccount {
   id                  String    @id @default(uuid())
   userId              String
-  user                User      @relation(fields: [userId], references: [id], onDelete: CASCADE)
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name                String
   apiKeyEncrypted     String
   apiIv               String
@@ -65,9 +67,9 @@ model ExchangeAccount {
 model Bot {
   id                      String        @id @default(uuid())
   userId                  String
-  user                    User          @relation(fields: [userId], references: [id], onDelete: CASCADE)
+  user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   exchangeAccountId       String?
-  exchangeAccount         ExchangeAccount? @relation(fields: [exchangeAccountId], references: [id], onDelete: SET_NULL)
+  exchangeAccount         ExchangeAccount? @relation(fields: [exchangeAccountId], references: [id], onDelete: SetNull)
   name                    String
   symbol                  String
   strategyType            StrategyType  @default(GRID)
@@ -139,7 +141,7 @@ enum BotStatus {
 model GridLevel {
   id              String            @id @default(uuid())
   botId           String
-  bot             Bot               @relation(fields: [botId], references: [id], onDelete: CASCADE)
+  bot             Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   levelIndex      Int
   price           Decimal           @db.Decimal(32, 16)
   status          GridLevelStatus   @default(IDLE)
@@ -173,7 +175,7 @@ enum GridLevelStatus {
 model Order {
   id                String        @id @default(uuid())
   botId             String
-  bot               Bot           @relation(fields: [botId], references: [id], onDelete: CASCADE)
+  bot               Bot           @relation(fields: [botId], references: [id], onDelete: Cascade)
   clientOrderId     String        @unique
   exchangeOrderId   String?
   symbol            String
@@ -231,9 +233,9 @@ enum OrderStatus {
 model Fill {
   id              String    @id @default(uuid())
   botId           String
-  bot             Bot       @relation(fields: [botId], references: [id], onDelete: CASCADE)
+  bot             Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
   orderId         String
-  order           Order     @relation(fields: [orderId], references: [id], onDelete: CASCADE)
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   fillId          String?   // Exchange fill ID
   price           Decimal   @db.Decimal(32, 16)
   quantity        Decimal   @db.Decimal(32, 16)
@@ -280,7 +282,7 @@ model Market {
 model Candle {
   id        String   @id @default(uuid())
   marketId  String
-  market    Market   @relation(fields: [marketId], references: [id], onDelete: CASCADE)
+  market    Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
   timestamp DateTime
   resolution String
   open      Decimal  @db.Decimal(32, 16)
@@ -300,7 +302,7 @@ model Candle {
 model BalanceSnapshot {
   id                String    @id @default(uuid())
   exchangeAccountId String?
-  exchangeAccount   ExchangeAccount? @relation(fields: [exchangeAccountId], references: [id], onDelete: CASCADE)
+  exchangeAccount   ExchangeAccount? @relation(fields: [exchangeAccountId], references: [id], onDelete: Cascade)
   botId             String?
   asset             String
   total             Decimal   @db.Decimal(32, 16)
@@ -322,7 +324,7 @@ model BalanceSnapshot {
 model PnLSnapshot {
   id              String    @id @default(uuid())
   botId           String
-  bot             Bot       @relation(fields: [botId], references: [id], onDelete: CASCADE)
+  bot             Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
   realizedPnL     Decimal   @db.Decimal(32, 16)
   unrealizedPnL   Decimal   @db.Decimal(32, 16)
   totalPnL        Decimal   @db.Decimal(32, 16)
@@ -370,7 +372,7 @@ enum BacktestStatus {
 model BacktestTrade {
   id          String    @id @default(uuid())
   backtestId  String
-  backtest    Backtest  @relation(fields: [backtestId], references: [id], onDelete: CASCADE)
+  backtest    Backtest  @relation(fields: [backtestId], references: [id], onDelete: Cascade)
   timestamp   DateTime
   side        OrderSide
   price       Decimal   @db.Decimal(32, 16)
@@ -395,7 +397,7 @@ model SystemSetting {
 model EventLog {
   id        String        @id @default(uuid())
   botId     String?
-  bot       Bot?          @relation(fields: [botId], references: [id], onDelete: CASCADE)
+  bot       Bot?          @relation(fields: [botId], references: [id], onDelete: Cascade)
   level     LogLevel      @default(INFO)
   event     String
   message   String
@@ -418,7 +420,7 @@ enum LogLevel {
 model AuditLog {
   id          String    @id @default(uuid())
   userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: CASCADE)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   action      String
   resource    String?
   resourceId  String?
