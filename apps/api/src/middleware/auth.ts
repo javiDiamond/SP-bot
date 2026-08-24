@@ -3,68 +3,29 @@
  */
 
 import { FastifyRequest, FastifyReply } from 'fastify';
-import fp from 'fastify-plugin';
-import jwt from '@fastify/jwt';
-import pino from 'pino';
 
-const logger = pino({ name: 'auth' });
-
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: 'ADMIN' | 'TRADER' | 'VIEWER';
-}
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: AuthUser;
+export async function authenticate(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    await request.jwtVerify();
+  } catch (error) {
+    throw reply.unauthorized('Invalid or expired token');
   }
 }
 
-export const authMiddleware = fp(async (fastify: any) => {
-  // Register JWT
-  fastify.register(jwt, {
-    secret: process.env.JWT_SECRET || 'change-me-secret-key',
-    sign: {
-      expiresIn: '1d',
-    },
-  });
-
-  // Decorate request with authenticate function
-  fastify.decorateRequest('authenticate', async function(
-    this: FastifyRequest,
-    reply: FastifyReply
-  ) {
-    try {
-      await this.jwtVerify();
-      
-      if (!this.user) {
-        reply.code(401).send({ error: 'Unauthorized' });
-        return;
-      }
-    } catch (error) {
-      reply.code(401).send({ error: 'Invalid token' });
-      return;
-    }
-  });
-});
-
-// Route protection decorator
-export function protectRoute(handler: Function) {
-  return async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      await request.jwtVerify();
-      
-      if (!request.user) {
-        return reply.code(401).send({ error: 'Unauthorized' });
-      }
-      
-      return handler(request, reply);
-    } catch (error) {
-      logger.error(error, 'Auth error');
-      return reply.code(401).send({ error: 'Invalid token' });
-    }
-  };
+export function getAuthUserId(request: FastifyRequest): string | null {
+  const user = request.user as any;
+  return user?.userId || null;
 }
 
-export default authMiddleware;
+export function getAuthUserRole(request: FastifyRequest): string | null {
+  const user = request.user as any;
+  return user?.role || null;
+}
+
+export function isAdmin(request: FastifyRequest): boolean {
+  const role = getAuthUserRole(request);
+  return role === 'ADMIN';
+}

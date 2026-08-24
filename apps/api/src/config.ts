@@ -1,5 +1,5 @@
 /**
- * Application Configuration
+ * API Configuration
  */
 
 import dotenv from 'dotenv';
@@ -8,39 +8,40 @@ dotenv.config();
 
 export const config = {
   // Server
-  port: parseInt(process.env.API_PORT || '3001', 10),
-  host: process.env.API_HOST || '0.0.0.0',
-  
-  // Environment
-  nodeEnv: process.env.NODE_ENV || 'development',
-  isProduction: process.env.NODE_ENV === 'production',
-  
-  // Live trading gates
-  enableLiveTrading: process.env.ENABLE_LIVE_TRADING === 'true',
+  port: parseInt(process.env.PORT || '4000', 10),
+  host: process.env.HOST || '0.0.0.0',
   
   // Database
-  databaseUrl: process.env.DATABASE_URL || 'postgresql://wallex:wallex@localhost:5432/wallex_grid',
+  databaseUrl: process.env.DATABASE_URL || 'postgresql://localhost:5432/wallex_grid_bot',
   
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   
-  // Wallex API
-  wallexBaseUrl: process.env.WALLEX_BASE_URL || 'https://api.wallex.ir',
+  // Security
+  jwtSecret: process.env.JWT_SECRET || 'fallback-secret-change-in-production',
+  encryptionKey: process.env.ENCRYPTION_KEY || 'fallback-encryption-key-32-chars!',
+  
+  // Wallex Exchange
+  wallexApiBaseUrl: process.env.WALLEX_API_BASE_URL || 'https://api.wallex.ir',
+  wallexWsUrl: process.env.WALLEX_WS_URL || 'wss://api.wallex.ir/ws',
   wallexApiKeyHeader: process.env.WALLEX_API_KEY_HEADER || 'API-Key',
   
-  // Security
-  jwtSecret: process.env.JWT_SECRET || 'change-me-in-production',
+  // Trading
+  enableLiveTrading: process.env.ENABLE_LIVE_TRADING === 'true',
+  defaultTradingMode: process.env.DEFAULT_TRADING_MODE || 'DRY_RUN',
   
-  // Rate limiting
+  // Risk Controls
+  stalePriceTimeoutSeconds: parseInt(process.env.STALE_PRICE_TIMEOUT_SECONDS || '30', 10),
+  restPollIntervalMs: parseInt(process.env.REST_POLL_INTERVAL_MS || '5000', 10),
+  orderRateLimitPer10s: parseInt(process.env.ORDER_RATE_LIMIT_PER_10S || '20', 10),
+  
+  // Rate Limiting
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
+  
+  // Admin
+  adminEmail: process.env.ADMIN_EMAIL || 'admin@example.com',
+  adminPassword: process.env.ADMIN_PASSWORD || 'change-me',
 };
-
-// Validate required configuration in production
-if (config.isProduction) {
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change-me-in-production') {
-    throw new Error('JWT_SECRET must be set in production');
-  }
-}
 
 export default config;
