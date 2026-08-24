@@ -22,7 +22,7 @@ import {
   INVENTORY_MODES,
   type GridConfig,
   type Market,
-} from '@wallex-grid/shared';
+} from '@wallex/shared';
 
 // ============================================================================
 // Types

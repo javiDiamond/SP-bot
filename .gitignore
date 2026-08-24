@@ -1,45 +1,58 @@
 ```
 # Dependencies
 node_modules/
-.pnpm-store/
-.yarn/
-yarn.lock
 
 # Build outputs
 dist/
 build/
-coverage/
-.nyc_output/
+target/
 
-# TypeScript/JavaScript
+# TypeScript
 *.tsbuildinfo
-.next/
-.nuxt/
-.un~*
+.nyc_output/
+coverage/
+
+# Logs
+*.log
 
 # Environment variables
 .env
 .env.local
-.env.*
+*.env*
 
 # IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Logs
-*.log
+*.tmp
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
-# Prisma
-prisma/migrations/
-prisma/schema.prisma.bak
-
-# Temporary files
-*.tmp
-*.temp
+# Python (if applicable)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/modules/
+.DS_Store
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
 ```
