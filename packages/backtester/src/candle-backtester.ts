@@ -1,4 +1,5 @@
-import { logger, DecimalUtils, GridMath, GridType } from '@wallex/shared';
+import Decimal from 'decimal.js';
+import { logger, GridMath, GridType, GridConfig, GridLevelStatus } from '@wallex/shared';
 
 export interface BacktestConfig {
   symbol: string;
@@ -14,31 +15,33 @@ export interface BacktestConfig {
   takerFeeRate: string;
   initialBaseBalance?: string;
   initialQuoteBalance?: string;
+  pricePrecision?: number;
+  amountPrecision?: number;
 }
 
 export interface BacktestTrade {
   timestamp: number;
   side: 'BUY' | 'SELL';
-  price: any;
-  quantity: any;
-  fee: any;
-  pnl?: any;
+  price: Decimal;
+  quantity: Decimal;
+  fee: Decimal;
+  pnl?: Decimal;
 }
 
 export interface BacktestMetrics {
-  totalReturn: any;
-  gridProfit: any;
-  unrealizedPnl: any;
-  totalPnl: any;
-  feesPaid: any;
+  totalReturn: Decimal;
+  gridProfit: Decimal;
+  unrealizedPnl: Decimal;
+  totalPnl: Decimal;
+  feesPaid: Decimal;
   numberOfBuys: number;
   numberOfSells: number;
   winRate: number;
-  maxDrawdown: any;
-  sharpeRatio: any;
-  sortinoRatio: any;
-  finalBalances: Record<string, any>;
-  equityCurve: Array<{ timestamp: number; value: any }>;
+  maxDrawdown: Decimal;
+  sharpeRatio: Decimal;
+  sortinoRatio: Decimal;
+  finalBalances: Record<string, Decimal>;
+  equityCurve: Array<{ timestamp: number; value: Decimal }>;
 }
 
 export interface BacktestResult {
@@ -66,61 +69,74 @@ export class CandleBasedBacktester {
       throw new Error('No candle data available for backtest period');
     }
 
-    // Generate grid levels
-    const gridLevels = GridMath.generateGridLevels(
-      DecimalUtils.fromString(config.lowerPrice),
-      DecimalUtils.fromString(config.upperPrice),
-      config.gridCount,
-      config.gridType,
-      8 // price precision
-    );
+    // Generate grid levels using GridMath
+    const gridConfig: GridConfig = {
+      gridType: config.gridType,
+      lowerPrice: config.lowerPrice,
+      upperPrice: config.upperPrice,
+      gridCount: config.gridCount,
+      totalInvestmentQuote: config.totalInvestmentQuote,
+      inventoryMode: 'EXISTING_ONLY',
+      makerOnly: true,
+      minProfitAfterFeesBps: 0,
+      onRangeExit: 'PAUSE_KEEP_ORDERS',
+      autoRecenter: false,
+      allowMarketOrders: false,
+    };
+
+    const pricePrecision = config.pricePrecision || 8;
+    const gridLevels = GridMath.generateGridLevels(gridConfig, pricePrecision);
 
     // Initialize state
-    let quoteBalance = DecimalUtils.fromString(config.initialQuoteBalance || config.totalInvestmentQuote);
-    let baseBalance = DecimalUtils.fromString(config.initialBaseBalance || '0');
-    let gridProfit = DecimalUtils.fromNumber(0);
-    let totalFees = DecimalUtils.fromNumber(0);
+    let quoteBalance = new Decimal(config.initialQuoteBalance || config.totalInvestmentQuote);
+    let baseBalance = new Decimal(config.initialBaseBalance || '0');
+    let gridProfit = new Decimal(0);
+    let totalFees = new Decimal(0);
     
-    const makerFeeRate = DecimalUtils.fromString(config.makerFeeRate);
-    const takerFeeRate = DecimalUtils.fromString(config.takerFeeRate);
+    const makerFeeRate = new Decimal(config.makerFeeRate);
+    const takerFeeRate = new Decimal(config.takerFeeRate);
 
     // Track active orders at each grid level
-    const activeBuyOrders = new Map<number, { price: any; quantity: any }>();
-    const activeSellOrders = new Map<number, { price: any; quantity: any }>();
+    const activeBuyOrders = new Map<number, { price: Decimal; quantity: Decimal }>();
+    const activeSellOrders = new Map<number, { price: Decimal; quantity: Decimal }>();
 
     // Place initial orders
-    const currentPrice = DecimalUtils.fromString(candles[0].close);
+    const currentPrice = new Decimal(candles[0].close);
     
     for (let i = 0; i < gridLevels.length; i++) {
       const level = gridLevels[i];
-      const levelPrice = DecimalUtils.fromString(level.price);
+      const levelPrice = new Decimal(level.price);
 
-      if (level.type === 'BUY' && levelPrice.lessThan(currentPrice)) {
+      // Determine if this is a buy or sell level based on position relative to current price
+      const isBuyLevel = levelPrice.lessThan(currentPrice);
+      const isSellLevel = levelPrice.greaterThan(currentPrice);
+
+      if (isBuyLevel) {
         // Calculate buy quantity
-        const quotePerGrid = DecimalUtils.fromString(config.totalInvestmentQuote)
-          .dividedBy(DecimalUtils.fromNumber(config.gridCount));
+        const quotePerGrid = new Decimal(config.totalInvestmentQuote)
+          .dividedBy(new Decimal(config.gridCount));
         const quantity = quotePerGrid.dividedBy(levelPrice);
 
         if (quantity.greaterThan(0)) {
           activeBuyOrders.set(i, { price: levelPrice, quantity });
         }
-      } else if (level.type === 'SELL' && levelPrice.greaterThan(currentPrice)) {
+      } else if (isSellLevel) {
         // Placeholder for sell order (will be filled when buy fills)
-        activeSellOrders.set(i, { price: levelPrice, quantity: DecimalUtils.fromNumber(0) });
+        activeSellOrders.set(i, { price: levelPrice, quantity: new Decimal(0) });
       }
     }
 
     // Equity curve tracking
-    const equityCurve: Array<{ timestamp: number; value: any }> = [];
+    const equityCurve: Array<{ timestamp: number; value: Decimal }> = [];
     const initialEquity = quoteBalance.plus(baseBalance.times(currentPrice));
 
     // Process candles
     for (const candle of candles) {
       const timestamp = candle.timestamp;
-      const open = DecimalUtils.fromString(candle.open);
-      const high = DecimalUtils.fromString(candle.high);
-      const low = DecimalUtils.fromString(candle.low);
-      const close = DecimalUtils.fromString(candle.close);
+      const open = new Decimal(candle.open);
+      const high = new Decimal(candle.high);
+      const low = new Decimal(candle.low);
+      const close = new Decimal(candle.close);
 
       // Check for buy order fills
       for (const [levelIndex, order] of activeBuyOrders.entries()) {
@@ -146,7 +162,7 @@ export class CandleBasedBacktester {
           const nextLevelIndex = levelIndex + 1;
           if (nextLevelIndex < gridLevels.length) {
             const nextLevel = gridLevels[nextLevelIndex];
-            const sellPrice = DecimalUtils.fromString(nextLevel.price);
+            const sellPrice = new Decimal(nextLevel.price);
             const sellQuantity = order.quantity; // Sell same quantity
 
             activeSellOrders.set(nextLevelIndex, {
@@ -192,7 +208,7 @@ export class CandleBasedBacktester {
           const prevLevelIndex = levelIndex - 1;
           if (prevLevelIndex >= 0) {
             const prevLevel = gridLevels[prevLevelIndex];
-            const buyPrice = DecimalUtils.fromString(prevLevel.price);
+            const buyPrice = new Decimal(prevLevel.price);
             const buyQuantity = quoteBalance
               .dividedBy(buyPrice)
               .min(order.quantity); // Don't buy more than we sold
@@ -216,7 +232,7 @@ export class CandleBasedBacktester {
     }
 
     // Calculate final metrics
-    const finalPrice = DecimalUtils.fromString(candles[candles.length - 1].close);
+    const finalPrice = new Decimal(candles[candles.length - 1].close);
     const finalEquity = quoteBalance.plus(baseBalance.times(finalPrice));
     
     const totalReturn = finalEquity.minus(initialEquity).dividedBy(initialEquity);
@@ -230,7 +246,7 @@ export class CandleBasedBacktester {
 
     // Calculate max drawdown
     let maxEquity = initialEquity;
-    let maxDrawdown = DecimalUtils.fromNumber(0);
+    let maxDrawdown = new Decimal(0);
     for (const point of equityCurve) {
       if (point.value.greaterThan(maxEquity)) {
         maxEquity = point.value;
@@ -245,17 +261,17 @@ export class CandleBasedBacktester {
     // Calculate Sharpe ratio (simplified)
     const returns = this.calculateReturns(equityCurve);
     const avgReturn = returns.length > 0 
-      ? returns.reduce((sum, r) => sum.plus(r), DecimalUtils.fromNumber(0)).dividedBy(returns.length)
-      : DecimalUtils.fromNumber(0);
+      ? returns.reduce((sum, r) => sum.plus(r), new Decimal(0)).dividedBy(returns.length)
+      : new Decimal(0);
     const stdDev = this.calculateStdDev(returns, avgReturn);
-    const sharpeRatio = stdDev.greaterThan(0) ? avgReturn.dividedBy(stdDev) : DecimalUtils.fromNumber(0);
+    const sharpeRatio = stdDev.greaterThan(0) ? avgReturn.dividedBy(stdDev) : new Decimal(0);
 
     // Sortino ratio (simplified)
     const negativeReturns = returns.filter(r => r.lessThan(0));
     const downsideDev = negativeReturns.length > 0
-      ? this.calculateStdDev(negativeReturns, DecimalUtils.fromNumber(0))
-      : DecimalUtils.fromNumber(0);
-    const sortinoRatio = downsideDev.greaterThan(0) ? avgReturn.dividedBy(downsideDev) : DecimalUtils.fromNumber(0);
+      ? this.calculateStdDev(negativeReturns, new Decimal(0))
+      : new Decimal(0);
+    const sortinoRatio = downsideDev.greaterThan(0) ? avgReturn.dividedBy(downsideDev) : new Decimal(0);
 
     const metrics: BacktestMetrics = {
       totalReturn,
@@ -297,8 +313,8 @@ export class CandleBasedBacktester {
     return [];
   }
 
-  private calculateReturns(equityCurve: Array<{ timestamp: number; value: any }>): any[] {
-    const returns: any[] = [];
+  private calculateReturns(equityCurve: Array<{ timestamp: number; value: Decimal }>): Decimal[] {
+    const returns: Decimal[] = [];
     for (let i = 1; i < equityCurve.length; i++) {
       const prevValue = equityCurve[i - 1].value;
       const currentValue = equityCurve[i].value;
@@ -309,9 +325,9 @@ export class CandleBasedBacktester {
     return returns;
   }
 
-  private calculateStdDev(values: any[], mean: any): any {
+  private calculateStdDev(values: Decimal[], mean: Decimal): Decimal {
     if (values.length === 0) {
-      return DecimalUtils.fromNumber(0);
+      return new Decimal(0);
     }
 
     const squaredDiffs = values.map(v => {
@@ -321,16 +337,16 @@ export class CandleBasedBacktester {
 
     const avgSquaredDiff = squaredDiffs.reduce(
       (sum, v) => sum.plus(v),
-      DecimalUtils.fromNumber(0)
+      new Decimal(0)
     ).dividedBy(values.length);
 
     // Approximate square root using Newton's method
     return this.sqrt(avgSquaredDiff);
   }
 
-  private sqrt(value: any): any {
+  private sqrt(value: Decimal): Decimal {
     if (value.lessThanOrEqualTo(0)) {
-      return DecimalUtils.fromNumber(0);
+      return new Decimal(0);
     }
 
     // Newton's method for square root
