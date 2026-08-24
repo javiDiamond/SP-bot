@@ -9,50 +9,27 @@ target/
 
 # TypeScript
 *.tsbuildinfo
-.nyc_output/
-coverage/
+*.js.map
+*.d.ts
+
+# Environment
+.env
+.env.local
+.env.*
 
 # Logs
 *.log
 
-# Environment variables
-.env
-.env.local
-*.env*
-
-# IDE files
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*.tmp
 
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Python (if applicable)
+# Python (if co-existing)
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-env/
 venv/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/modules/
-.DS_Store
-.hypothesis/
-.pytest_cache/
-.mypy_cache/
 ```

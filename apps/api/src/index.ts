@@ -14,6 +14,12 @@ import { config } from './config.js';
 import { connectDatabase, disconnectDatabase } from './lib/database.js';
 import marketsRoutes from './routes/markets.js';
 import botsRoutes from './routes/bots.js';
+import authRoutes from './routes/auth.js';
+import accountsRoutes from './routes/accounts.js';
+import balancesRoutes from './routes/balances.js';
+import ordersRoutes from './routes/orders.js';
+import backtestRoutes from './routes/backtests.js';
+import systemRoutes from './routes/system.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -47,8 +53,14 @@ await fastify.register(jwt, {
 });
 
 // Register routes
+await fastify.register(authRoutes, { prefix: '/api/auth' });
 await fastify.register(marketsRoutes, { prefix: '/api/v1/markets' });
 await fastify.register(botsRoutes, { prefix: '/api/v1/bots' });
+await fastify.register(accountsRoutes, { prefix: '/api/accounts' });
+await fastify.register(balancesRoutes, { prefix: '/api/balances' });
+await fastify.register(ordersRoutes, { prefix: '/api/orders' });
+await fastify.register(backtestRoutes, { prefix: '/api/backtests' });
+await fastify.register(systemRoutes, { prefix: '/api/system' });
 
 // Health check
 fastify.get('/health', async () => {
@@ -62,9 +74,14 @@ fastify.get('/api', async () => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
+      auth: '/api/auth',
       markets: '/api/v1/markets',
       bots: '/api/v1/bots',
-      backtests: '/api/v1/backtests',
+      accounts: '/api/accounts',
+      balances: '/api/balances',
+      orders: '/api/orders',
+      backtests: '/api/backtests',
+      system: '/api/system',
     },
   };
 });
