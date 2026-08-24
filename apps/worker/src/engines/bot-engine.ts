@@ -1,16 +1,29 @@
-import { Bot, GridConfig, ExchangeAccount } from '@wallex/db';
+import { Bot, ExchangeAccount } from '@wallex/db';
+import type { GridConfig as GridConfigType } from '@wallex/shared';
 import { 
   logger, 
   BotStatus, 
   OrderStatus,
+  GridLevelStatus,
   generateClientOrderId,
   DecimalUtils,
   GridMath,
-  type GridLevel as GridLevelType
+  OrderSide
 } from '@wallex/shared';
 import { WallexExchange } from '@wallex/exchange';
 import { EventEmitter } from 'events';
 import { prisma } from '@wallex/db';
+import Decimal from 'decimal.js';
+
+interface LocalGridLevel {
+  levelIndex: number;
+  price: string;
+  side: 'BUY' | 'SELL';
+  status: GridLevelStatus;
+  buyOrderId?: string;
+  sellOrderId?: string;
+  filledQuantity: string;
+}
 
 export interface OrderPlacedEvent {
   botId: string;
@@ -33,18 +46,18 @@ export interface OrderFilledEvent {
 
 export class BotEngine extends EventEmitter {
   private bot: Bot;
-  private gridConfig: GridConfig;
+  private gridConfig: GridConfigType;
   private exchangeAccount: ExchangeAccount;
   private exchange: WallexExchange;
   private status: BotStatus = BotStatus.DRAFT;
-  private gridLevels: Map<number, GridLevelType> = new Map();
+  private gridLevels: Map<number, LocalGridLevel> = new Map();
   private activeOrders: Map<string, any> = new Map();
   private reconciliationInterval?: NodeJS.Timeout;
   private isHealthyFlag = true;
 
   constructor(
     bot: Bot,
-    gridConfig: GridConfig,
+    gridConfig: GridConfigType,
     exchangeAccount: ExchangeAccount
   ) {
     super();
@@ -52,10 +65,12 @@ export class BotEngine extends EventEmitter {
     this.gridConfig = gridConfig;
     this.exchangeAccount = exchangeAccount;
     
-    // Initialize exchange adapter
+    // Initialize exchange adapter - convert TradingMode to ExchangeMode
+    const mode = bot.mode === 'DRY_RUN' ? 1 : 0; // DRY_RUN=1, LIVE=0
+    
     this.exchange = new WallexExchange({
-      apiKey: exchangeAccount.apiKey, // Will be decrypted by ExchangeAccount getter
-      mode: bot.mode,
+      apiKey: (exchangeAccount as any).apiKeyEncrypted, // Will be decrypted by ExchangeAccount getter
+      mode: mode as any,
       symbol: bot.symbol,
     });
   }
@@ -269,9 +284,9 @@ export class BotEngine extends EventEmitter {
       this.gridLevels.set(index, {
         levelIndex: index,
         price: level.price,
-        type: level.type,
+        side: level.type === 'BUY' ? 'BUY' : 'SELL',
         status: 'IDLE',
-        botId: this.bot.id,
+        filledQuantity: '0',
       });
     });
 
@@ -310,13 +325,13 @@ export class BotEngine extends EventEmitter {
       throw new Error(`Could not get ticker for ${this.bot.symbol}`);
     }
 
-    const currentPrice = DecimalUtils.fromString(ticker.lastPrice);
+    const currentPrice = new Decimal(ticker.lastPrice);
 
     // Place buy orders below current price
     for (const [index, level] of this.gridLevels.entries()) {
-      if (level.type !== 'BUY') continue;
+      if (level.side !== 'BUY') continue;
       
-      const levelPrice = DecimalUtils.fromString(level.price);
+      const levelPrice = new Decimal(level.price);
       if (levelPrice.greaterThanOrEqualTo(currentPrice)) continue;
 
       // Check if order already exists
@@ -378,9 +393,9 @@ export class BotEngine extends EventEmitter {
 
     // Place sell orders above current price
     for (const [index, level] of this.gridLevels.entries()) {
-      if (level.type !== 'SELL') continue;
+      if (level.side !== 'SELL') continue;
       
-      const levelPrice = DecimalUtils.fromString(level.price);
+      const levelPrice = new Decimal(level.price);
       if (levelPrice.lessThanOrEqualTo(currentPrice)) continue;
 
       // Check if order already exists
@@ -441,7 +456,7 @@ export class BotEngine extends EventEmitter {
     }
   }
 
-  private calculateOrderQuantity(price: any, side: 'BUY' | 'SELL'): any {
+  private calculateOrderQuantity(price: Decimal, side: 'BUY' | 'SELL'): Decimal {
     // Simplified quantity calculation
     // In production, this would consider:
     // - Available balance
@@ -449,10 +464,10 @@ export class BotEngine extends EventEmitter {
     // - Minimum order size
     // - Precision rounding
     
-    const totalInvestment = DecimalUtils.fromString(
+    const totalInvestment = new Decimal(
       this.gridConfig.totalInvestmentQuote?.toString() || '1000'
     );
-    const gridCount = DecimalUtils.fromNumber(this.gridConfig.gridCount);
+    const gridCount = new Decimal(this.gridConfig.gridCount);
     
     const quotePerGrid = totalInvestment.dividedBy(gridCount);
     
