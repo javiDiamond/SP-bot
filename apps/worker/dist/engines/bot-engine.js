@@ -1,10 +1,14 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BotEngine = void 0;
 const shared_1 = require("@wallex/shared");
 const exchange_1 = require("@wallex/exchange");
 const events_1 = require("events");
 const db_1 = require("@wallex/db");
+const decimal_js_1 = __importDefault(require("decimal.js"));
 class BotEngine extends events_1.EventEmitter {
     bot;
     gridConfig;
@@ -183,9 +187,9 @@ class BotEngine extends events_1.EventEmitter {
             this.gridLevels.set(index, {
                 levelIndex: index,
                 price: level.price,
-                type: level.type,
+                side: level.type === 'BUY' ? 'BUY' : 'SELL',
                 status: 'IDLE',
-                botId: this.bot.id,
+                filledQuantity: '0',
             });
         });
         shared_1.logger.info(`Generated ${levels.length} grid levels for bot ${this.bot.id}`);
@@ -214,12 +218,12 @@ class BotEngine extends events_1.EventEmitter {
         if (!ticker) {
             throw new Error(`Could not get ticker for ${this.bot.symbol}`);
         }
-        const currentPrice = shared_1.DecimalUtils.fromString(ticker.lastPrice);
+        const currentPrice = new decimal_js_1.default(ticker.lastPrice);
         // Place buy orders below current price
         for (const [index, level] of this.gridLevels.entries()) {
-            if (level.type !== 'BUY')
+            if (level.side !== 'BUY')
                 continue;
-            const levelPrice = shared_1.DecimalUtils.fromString(level.price);
+            const levelPrice = new decimal_js_1.default(level.price);
             if (levelPrice.greaterThanOrEqualTo(currentPrice))
                 continue;
             // Check if order already exists
@@ -275,9 +279,9 @@ class BotEngine extends events_1.EventEmitter {
         }
         // Place sell orders above current price
         for (const [index, level] of this.gridLevels.entries()) {
-            if (level.type !== 'SELL')
+            if (level.side !== 'SELL')
                 continue;
-            const levelPrice = shared_1.DecimalUtils.fromString(level.price);
+            const levelPrice = new decimal_js_1.default(level.price);
             if (levelPrice.lessThanOrEqualTo(currentPrice))
                 continue;
             // Check if order already exists
@@ -339,8 +343,8 @@ class BotEngine extends events_1.EventEmitter {
         // - Quote/base per grid
         // - Minimum order size
         // - Precision rounding
-        const totalInvestment = shared_1.DecimalUtils.fromString(this.gridConfig.totalInvestmentQuote?.toString() || '1000');
-        const gridCount = shared_1.DecimalUtils.fromNumber(this.gridConfig.gridCount);
+        const totalInvestment = new decimal_js_1.default(this.gridConfig.totalInvestmentQuote?.toString() || '1000');
+        const gridCount = new decimal_js_1.default(this.gridConfig.gridCount);
         const quotePerGrid = totalInvestment.dividedBy(gridCount);
         if (side === 'BUY') {
             return quotePerGrid.dividedBy(price);

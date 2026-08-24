@@ -55,3 +55,16 @@ export {
   PaperFill,
   PaperBalance,
 } from './paper-exchange';
+
+// Unified exchange adapter
+export {
+  WallexExchange,
+  ExchangeMode,
+  WallexExchangeConfig,
+} from './exchange-adapter';
+
+export type {
+  Ticker,
+  OrderResult,
+  CancelResult,
+} from './exchange-adapter';
