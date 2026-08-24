@@ -1,5 +1,5 @@
 {
-  "name": "@wallex-grid/exchange",
+  "name": "@wallex/exchange",
   "version": "1.0.0",
   "description": "Wallex Exchange REST and WebSocket client",
   "main": "src/index.ts",
@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@wallex/shared": "workspace:*",
     "decimal.js": "^10.4.3",
     "isomorphic-ws": "^5.0.0",
     "pino": "^9.4.0",

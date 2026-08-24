@@ -1,177 +1,148 @@
-import { prisma } from '../prisma-client';
-import type { User } from '../../generated';
-import * as crypto from 'crypto';
+import { PrismaClient } from '../generated';
+import bcrypt from 'bcryptjs';
 
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16;
-const AUTH_TAG_LENGTH = 16;
+const prisma = new PrismaClient();
 
-function getEncryptionKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key) {
-    throw new Error('ENCRYPTION_KEY environment variable is not set');
-  }
-  // Hash the key to ensure it's 32 bytes for AES-256
-  return crypto.createHash('sha256').update(key).digest();
-}
+async function main() {
+  console.log('🌱 Starting database seed...');
 
-export function encryptApiKey(apiKey: string): string {
-  const key = getEncryptionKey();
-  const iv = crypto.randomBytes(IV_LENGTH);
-  
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  let encrypted = cipher.update(apiKey, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  
-  const authTag = cipher.getAuthTag();
-  
-  // Combine IV + auth tag + encrypted data
-  const combined = Buffer.concat([
-    iv,
-    authTag,
-    Buffer.from(encrypted, 'hex'),
-  ]);
-  
-  return combined.toString('base64');
-}
-
-export function decryptApiKey(encryptedData: string): string {
-  const key = getEncryptionKey();
-  const combined = Buffer.from(encryptedData, 'base64');
-  
-  const iv = combined.subarray(0, IV_LENGTH);
-  const authTag = combined.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
-  const encrypted = combined.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
-  
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(authTag);
-  
-  let decrypted = decipher.update(encrypted);
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
-  
-  return decrypted.toString('utf8');
-}
-
-export function maskApiKey(apiKey: string): string {
-  if (apiKey.length <= 8) {
-    return '*'.repeat(apiKey.length);
-  }
-  return `${apiKey.substring(0, 4)}${'*'.repeat(apiKey.length - 8)}${apiKey.substring(apiKey.length - 4)}`;
-}
-
-// Create admin user if not exists
-export async function createAdminUserIfNotExists(): Promise<User> {
+  // Create admin user
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@wallex-grid.local';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'change-me-immediately';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   
-  const existingAdmin = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findUnique({
     where: { email: adminEmail },
   });
-  
-  if (existingAdmin) {
-    return existingAdmin;
-  }
-  
-  const bcrypt = await import('bcryptjs');
-  const hashedPassword = await bcrypt.default.hash(adminPassword, 10);
-  
-  const admin = await prisma.user.create({
-    data: {
-      email: adminEmail,
-      password: hashedPassword,
-      role: 'ADMIN',
-      name: 'System Administrator',
-    },
-  });
-  
-  console.log(`Admin user created: ${adminEmail}`);
-  return admin;
-}
 
-// Create demo exchange account for testing
-export async function createDemoExchangeAccount(userId: string): Promise<void> {
-  const existing = await prisma.exchangeAccount.findFirst({
-    where: {
-      userId,
-      name: 'Demo Paper Account',
-    },
-  });
-  
-  if (existing) {
-    return;
+  if (existingUser) {
+    console.log(`✅ Admin user ${adminEmail} already exists`);
+  } else {
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    
+    const adminUser = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        passwordHash,
+        role: 'ADMIN',
+      },
+    });
+    
+    console.log(`✅ Created admin user: ${adminUser.email}`);
   }
-  
-  await prisma.exchangeAccount.create({
-    data: {
-      userId,
-      name: 'Demo Paper Account',
-      tradingMode: 'DRY_RUN',
-      isActive: true,
-      apiKeyEncrypted: '', // Empty for paper trading
-      apiSecretEncrypted: '',
-      note: 'Default paper trading account - no real API keys needed',
-    },
-  });
-  
-  console.log('Demo paper trading account created');
-}
 
-// Create sample market data
-export async function createSampleMarkets(): Promise<void> {
+  // Create system risk settings
+  const existingRiskSettings = await prisma.riskSetting.findUnique({
+    where: { key: 'global' },
+  });
+
+  if (existingRiskSettings) {
+    console.log('✅ Global risk settings already exist');
+  } else {
+    await prisma.riskSetting.create({
+      data: {
+        key: 'global',
+        maxBotsGlobal: 10,
+        maxBotsPerSymbol: 3,
+        maxDailyLossPercent: 5,
+        maxQuoteExposureGlobal: 100000,
+        killSwitchActive: false,
+        allowLiveTrading: false,
+      },
+    });
+    
+    console.log('✅ Created global risk settings');
+  }
+
+  // Create sample markets (will be synced with real Wallex data on first run)
   const sampleMarkets = [
     {
       symbol: 'BTCUSDT',
       baseAsset: 'BTC',
       quoteAsset: 'USDT',
       isSpot: true,
-      isTmnBased: false,
       isUsdtBased: true,
-      amountPrecision: 6,
+      amountPrecision: 8,
       pricePrecision: 2,
-      minNotional: 10,
+      minNotional: 1,
+      isActive: true,
     },
     {
       symbol: 'ETHUSDT',
       baseAsset: 'ETH',
       quoteAsset: 'USDT',
       isSpot: true,
-      isTmnBased: false,
       isUsdtBased: true,
-      amountPrecision: 5,
+      amountPrecision: 8,
       pricePrecision: 2,
-      minNotional: 10,
-    },
-    {
-      symbol: 'BTCTMN',
-      baseAsset: 'BTC',
-      quoteAsset: 'TMN',
-      isSpot: true,
-      isTmnBased: true,
-      isUsdtBased: false,
-      amountPrecision: 6,
-      pricePrecision: 0,
-      minNotional: 500000,
+      minNotional: 1,
+      isActive: true,
     },
   ];
-  
-  for (const market of sampleMarkets) {
-    await prisma.market.upsert({
-      where: { symbol: market.symbol },
-      update: market,
-      create: market as any,
+
+  for (const marketData of sampleMarkets) {
+    const existingMarket = await prisma.market.findUnique({
+      where: { symbol: marketData.symbol },
     });
+
+    if (!existingMarket) {
+      await prisma.market.create({
+        data: marketData as any,
+      });
+      console.log(`✅ Created market: ${marketData.symbol}`);
+    }
   }
-  
-  console.log('Sample markets created/updated');
+
+  // Create demo exchange account (paper trading)
+  const user = await prisma.user.findFirst({
+    where: { email: adminEmail },
+  });
+
+  if (user) {
+    const existingDemoAccount = await prisma.exchangeAccount.findFirst({
+      where: {
+        userId: user.id,
+        name: 'Demo Paper Trading',
+      },
+    });
+
+    if (!existingDemoAccount) {
+      // Encrypt a dummy API key for demo purposes
+      const crypto = require('crypto');
+      const dummyKey = 'demo_api_key_12345';
+      const iv = crypto.randomBytes(16);
+      const cipher = crypto.createCipheriv(
+        'aes-256-gcm',
+        Buffer.from(process.env.ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef', 'hex'),
+        iv
+      );
+      let encrypted = cipher.update(dummyKey, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      const authTag = cipher.getAuthTag().toString('hex');
+
+      await prisma.exchangeAccount.create({
+        data: {
+          userId: user.id,
+          name: 'Demo Paper Trading',
+          apiKeyEncrypted: encrypted,
+          apiIv: iv.toString('hex'),
+          apiAuthTag: authTag,
+          isLiveEnabled: false,
+          isActive: true,
+        },
+      });
+      
+      console.log('✅ Created demo paper trading account');
+    }
+  }
+
+  console.log('🎉 Database seeding completed!');
 }
 
-// Run all seeds
-export async function seedDatabase(): Promise<void> {
-  console.log('Starting database seeding...');
-  
-  const admin = await createAdminUserIfNotExists();
-  await createDemoExchangeAccount(admin.id);
-  await createSampleMarkets();
-  
-  console.log('Database seeding completed');
-}
+main()
+  .catch((e) => {
+    console.error('❌ Seed error:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

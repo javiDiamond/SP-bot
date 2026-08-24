@@ -6,24 +6,20 @@ export class OrderRepository {
     return prisma.order.findUnique({
       where: { id },
       include: {
-        bot: true,
-        fills: true,
+        fills: {
+          orderBy: { timestamp: 'asc' },
+        },
       },
     });
   }
 
-  async findByClientOrderId(
-    clientOrderId: string,
-    botId?: string
-  ): Promise<Order | null> {
-    const where: Prisma.OrderWhereInput = { clientOrderId };
-    if (botId) where.botId = botId;
-    
-    return prisma.order.findFirst({
-      where,
+  async findByClientOrderId(clientOrderId: string): Promise<Order | null> {
+    return prisma.order.findUnique({
+      where: { clientOrderId },
       include: {
-        bot: true,
-        fills: true,
+        fills: {
+          orderBy: { timestamp: 'asc' },
+        },
       },
     });
   }
@@ -33,33 +29,21 @@ export class OrderRepository {
     offset?: number;
     status?: string;
   }): Promise<Order[]> {
-    const { limit = 100, offset = 0, status } = options || {};
+    const { limit = 50, offset = 0, status } = options || {};
     
     const where: Prisma.OrderWhereInput = { botId };
-    if (status) where.status = status;
+    if (status) where.status = status as any;
 
     return prisma.order.findMany({
       where,
       include: {
-        fills: true,
+        fills: {
+          orderBy: { timestamp: 'asc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip: offset,
       take: limit,
-    });
-  }
-
-  async findOpenOrdersByBotId(botId: string): Promise<Order[]> {
-    return prisma.order.findMany({
-      where: {
-        botId,
-        status: {
-          in: ['NEW', 'PARTIALLY_FILLED', 'PENDING'],
-        },
-      },
-      include: {
-        fills: true,
-      },
     });
   }
 
@@ -76,19 +60,29 @@ export class OrderRepository {
     });
   }
 
-  async updateByClientOrderId(
-    clientOrderId: string,
-    data: Prisma.OrderUpdateInput
-  ): Promise<Order | null> {
-    const order = await prisma.order.findFirst({
-      where: { clientOrderId },
-    });
+  async updateStatus(
+    id: string,
+    status: string,
+    executedQty?: string,
+    executedSum?: string
+  ): Promise<Order> {
+    const updateData: Prisma.OrderUpdateInput = {
+      status: status as any,
+    };
 
-    if (!order) return null;
+    if (executedQty !== undefined) {
+      updateData.executedQty = parseFloat(executedQty);
+    }
+    if (executedSum !== undefined) {
+      updateData.executedSum = parseFloat(executedSum);
+    }
+    if (status === 'FILLED' || status === 'PARTIALLY_FILLED') {
+      updateData.executedAt = new Date();
+    }
 
     return prisma.order.update({
-      where: { id: order.id },
-      data,
+      where: { id },
+      data: updateData,
     });
   }
 
@@ -100,40 +94,37 @@ export class OrderRepository {
 
   async list(options?: {
     botId?: string;
-    userId?: string;
     symbol?: string;
     status?: string;
     side?: string;
+    isDryRun?: boolean;
     limit?: number;
     offset?: number;
   }): Promise<{ orders: Order[]; total: number }> {
     const {
       botId,
-      userId,
       symbol,
       status,
       side,
-      limit = 100,
+      isDryRun,
+      limit = 50,
       offset = 0,
     } = options || {};
 
     const where: Prisma.OrderWhereInput = {};
     if (botId) where.botId = botId;
     if (symbol) where.symbol = symbol;
-    if (status) where.status = status;
-    if (side) where.side = side;
-    if (userId) {
-      where.bot = {
-        userId,
-      };
-    }
+    if (status) where.status = status as any;
+    if (side) where.side = side as any;
+    if (isDryRun !== undefined) where.isDryRun = isDryRun;
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where,
         include: {
-          bot: true,
-          fills: true,
+          fills: {
+            orderBy: { timestamp: 'asc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: offset,
@@ -145,30 +136,36 @@ export class OrderRepository {
     return { orders, total };
   }
 
+  async findOpenOrders(botId?: string): Promise<Order[]> {
+    const where: Prisma.OrderWhereInput = {
+      status: {
+        in: ['NEW', 'PARTIALLY_FILLED', 'PENDING'] as any[],
+      },
+    };
+    
+    if (botId) {
+      where.botId = botId;
+    }
+
+    return prisma.order.findMany({
+      where,
+      include: {
+        fills: true,
+      },
+    });
+  }
+
   async count(options?: {
     botId?: string;
     status?: string;
+    isDryRun?: boolean;
   }): Promise<number> {
-    const { botId, status } = options || {};
+    const { botId, status, isDryRun } = options || {};
     const where: Prisma.OrderWhereInput = {};
     if (botId) where.botId = botId;
-    if (status) where.status = status;
+    if (status) where.status = status as any;
+    if (isDryRun !== undefined) where.isDryRun = isDryRun;
     return prisma.order.count({ where });
-  }
-
-  async cancelAllByBotId(botId: string): Promise<number> {
-    const result = await prisma.order.updateMany({
-      where: {
-        botId,
-        status: {
-          in: ['NEW', 'PARTIALLY_FILLED', 'PENDING'],
-        },
-      },
-      data: {
-        status: 'CANCELED',
-      },
-    });
-    return result.count;
   }
 }
 
