@@ -1,0 +1,451 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User & Authentication
+// ============================================================================
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String
+  role             UserRole          @default(ADMIN)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  exchangeAccounts ExchangeAccount[]
+  bots             Bot[]
+  auditLogs        AuditLog[]
+
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  TRADER
+  VIEWER
+}
+
+// ============================================================================
+// Exchange Account (Encrypted API Keys)
+// ============================================================================
+
+model ExchangeAccount {
+  id                 String            @id @default(uuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  apiKeyEncrypted    String
+  apiIv              String
+  apiAuthTag         String
+  subAccountClientId String?
+  isLiveEnabled      Boolean           @default(false)
+  isActive           Boolean           @default(true)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  bots               Bot[]
+  balanceSnapshots   BalanceSnapshot[]
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+// ============================================================================
+// Bot Configuration
+// ============================================================================
+
+model Bot {
+  id                String           @id @default(uuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exchangeAccountId String?
+  exchangeAccount   ExchangeAccount? @relation(fields: [exchangeAccountId], references: [id], onDelete: SetNull)
+  name              String
+  symbol            String
+  strategyType      StrategyType     @default(GRID)
+  mode              TradingMode      @default(DRY_RUN)
+  status            BotStatus        @default(DRAFT)
+
+  // Grid configuration stored as JSON for flexibility
+  gridConfig   Json
+  runtimeState Json?
+
+  // Risk limits
+  maxQuoteExposure      Decimal? @db.Decimal(32, 16)
+  maxBaseExposure       Decimal? @db.Decimal(32, 16)
+  dailyLossLimitPercent Decimal? @db.Decimal(5, 4)
+
+  // PnL tracking
+  realizedPnL   Decimal @default(0) @db.Decimal(32, 16)
+  unrealizedPnL Decimal @default(0) @db.Decimal(32, 16)
+  totalFeesPaid Decimal @default(0) @db.Decimal(32, 16)
+
+  // Statistics
+  totalBuys       Int @default(0)
+  totalSells      Int @default(0)
+  totalGridCycles Int @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  startedAt DateTime?
+  stoppedAt DateTime?
+
+  orders       Order[]
+  fills        Fill[]
+  gridLevels   GridLevel[]
+  pnlSnapshots PnLSnapshot[]
+  eventLogs    EventLog[]
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([status])
+  @@index([mode])
+}
+
+enum StrategyType {
+  GRID
+}
+
+enum TradingMode {
+  DRY_RUN
+  LIVE
+}
+
+enum BotStatus {
+  DRAFT
+  STARTING
+  RUNNING
+  PAUSING
+  PAUSED
+  STOPPING
+  STOPPED
+  ERROR
+  RANGE_EXITED
+  KILLED
+}
+
+// ============================================================================
+// Grid Levels
+// ============================================================================
+
+model GridLevel {
+  id             String          @id @default(uuid())
+  botId          String
+  bot            Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+  levelIndex     Int
+  price          Decimal         @db.Decimal(32, 16)
+  status         GridLevelStatus @default(IDLE)
+  buyOrderId     String?
+  sellOrderId    String?
+  filledQuantity Decimal         @default(0) @db.Decimal(32, 16)
+  averageCost    Decimal?        @db.Decimal(32, 16)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([botId, levelIndex])
+  @@index([botId])
+  @@index([status])
+}
+
+enum GridLevelStatus {
+  IDLE
+  BUY_ORDER_OPEN
+  BUY_PARTIALLY_FILLED
+  BUY_FILLED
+  SELL_ORDER_OPEN
+  SELL_PARTIALLY_FILLED
+  SELL_FILLED
+  ERROR
+}
+
+// ============================================================================
+// Orders
+// ============================================================================
+
+model Order {
+  id              String      @id @default(uuid())
+  botId           String
+  bot             Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
+  clientOrderId   String      @unique
+  exchangeOrderId String?
+  symbol          String
+  side            OrderSide
+  type            OrderType
+  status          OrderStatus @default(PENDING)
+  price           Decimal     @db.Decimal(32, 16)
+  quantity        Decimal     @db.Decimal(32, 16)
+  executedQty     Decimal     @default(0) @db.Decimal(32, 16)
+  executedSum     Decimal     @default(0) @db.Decimal(32, 16)
+  fee             Decimal     @default(0) @db.Decimal(32, 16)
+  feeAsset        String?
+  isDryRun        Boolean     @default(true)
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  executedAt      DateTime?
+
+  fills Fill[]
+
+  @@index([botId])
+  @@index([clientOrderId])
+  @@index([symbol])
+  @@index([status])
+  @@index([side])
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+  STOP_LIMIT
+  STOP_MARKET
+}
+
+enum OrderStatus {
+  PENDING
+  NEW
+  PARTIALLY_FILLED
+  FILLED
+  CANCELED
+  REJECTED
+  EXPIRED
+  UNKNOWN
+}
+
+// ============================================================================
+// Fills
+// ============================================================================
+
+model Fill {
+  id        String   @id @default(uuid())
+  botId     String
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fillId    String? // Exchange fill ID
+  price     Decimal  @db.Decimal(32, 16)
+  quantity  Decimal  @db.Decimal(32, 16)
+  sum       Decimal  @db.Decimal(32, 16)
+  fee       Decimal  @default(0) @db.Decimal(32, 16)
+  feeAsset  String?
+  isBuyer   Boolean
+  isMaker   Boolean?
+  isDryRun  Boolean  @default(true)
+  timestamp DateTime @default(now())
+
+  @@index([botId])
+  @@index([orderId])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// Market Data
+// ============================================================================
+
+model Market {
+  id              String   @id @default(uuid())
+  symbol          String   @unique
+  baseAsset       String
+  quoteAsset      String
+  isSpot          Boolean  @default(true)
+  isTmnBased      Boolean  @default(false)
+  isUsdtBased     Boolean  @default(false)
+  amountPrecision Int      @default(8)
+  pricePrecision  Int      @default(8)
+  minNotional     Decimal? @db.Decimal(32, 16)
+  isActive        Boolean  @default(true)
+  lastPrice       Decimal? @db.Decimal(32, 16)
+  volume24h       Decimal? @db.Decimal(32, 16)
+  updatedAt       DateTime @updatedAt
+
+  candles Candle[]
+
+  @@index([symbol])
+  @@index([isSpot])
+  @@index([isActive])
+}
+
+model Candle {
+  id         String   @id @default(uuid())
+  marketId   String
+  market     Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  timestamp  DateTime
+  resolution String
+  open       Decimal  @db.Decimal(32, 16)
+  high       Decimal  @db.Decimal(32, 16)
+  low        Decimal  @db.Decimal(32, 16)
+  close      Decimal  @db.Decimal(32, 16)
+  volume     Decimal  @db.Decimal(32, 16)
+
+  @@unique([marketId, timestamp, resolution])
+  @@index([marketId, resolution, timestamp])
+}
+
+// ============================================================================
+// Balance Snapshots
+// ============================================================================
+
+model BalanceSnapshot {
+  id                String           @id @default(uuid())
+  exchangeAccountId String?
+  exchangeAccount   ExchangeAccount? @relation(fields: [exchangeAccountId], references: [id], onDelete: Cascade)
+  botId             String?
+  asset             String
+  total             Decimal          @db.Decimal(32, 16)
+  available         Decimal          @db.Decimal(32, 16)
+  locked            Decimal          @db.Decimal(32, 16)
+  isDryRun          Boolean          @default(true)
+  timestamp         DateTime         @default(now())
+
+  @@index([exchangeAccountId])
+  @@index([botId])
+  @@index([asset])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// PnL Snapshots
+// ============================================================================
+
+model PnLSnapshot {
+  id            String   @id @default(uuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  realizedPnL   Decimal  @db.Decimal(32, 16)
+  unrealizedPnL Decimal  @db.Decimal(32, 16)
+  totalPnL      Decimal  @db.Decimal(32, 16)
+  feesPaid      Decimal  @db.Decimal(32, 16)
+  baseBalance   Decimal  @db.Decimal(32, 16)
+  quoteBalance  Decimal  @db.Decimal(32, 16)
+  timestamp     DateTime @default(now())
+
+  @@index([botId])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// Backtesting
+// ============================================================================
+
+model Backtest {
+  id          String         @id @default(uuid())
+  userId      String
+  name        String
+  symbol      String
+  dateFrom    DateTime
+  dateTo      DateTime
+  resolution  String
+  config      Json
+  results     Json?
+  status      BacktestStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  trades BacktestTrade[]
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([status])
+}
+
+enum BacktestStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model BacktestTrade {
+  id         String    @id @default(uuid())
+  backtestId String
+  backtest   Backtest  @relation(fields: [backtestId], references: [id], onDelete: Cascade)
+  timestamp  DateTime
+  side       OrderSide
+  price      Decimal   @db.Decimal(32, 16)
+  quantity   Decimal   @db.Decimal(32, 16)
+  fee        Decimal   @db.Decimal(32, 16)
+  pnl        Decimal   @db.Decimal(32, 16)
+
+  @@index([backtestId])
+  @@index([timestamp])
+}
+
+// ============================================================================
+// System Settings & Logs
+// ============================================================================
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model EventLog {
+  id        String   @id @default(uuid())
+  botId     String?
+  bot       Bot?     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  level     LogLevel @default(INFO)
+  event     String
+  message   String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([botId])
+  @@index([level])
+  @@index([event])
+  @@index([createdAt])
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String
+  resource   String?
+  resourceId String?
+  ipAddress  String?
+  userAgent  String?
+  data       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// Risk Settings (Global)
+// ============================================================================
+
+model RiskSetting {
+  id                     String   @id @default(uuid())
+  key                    String   @unique
+  maxBotsGlobal          Int      @default(10)
+  maxBotsPerSymbol       Int      @default(3)
+  maxDailyLossPercent    Decimal  @default(5) @db.Decimal(5, 4)
+  maxQuoteExposureGlobal Decimal  @default(100000) @db.Decimal(32, 16)
+  killSwitchActive       Boolean  @default(false)
+  allowLiveTrading       Boolean  @default(false)
+  updatedAt              DateTime @updatedAt
+}
