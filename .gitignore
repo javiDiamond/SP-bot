@@ -1,10 +1,15 @@
-```
 # Build artifacts
 .next/
 dist/
 build/
 *.d.ts.map
 *.js.map
+
+# Generated Prisma client
+packages/db/generated/
+
+# Turbo
+.turbo/
 
 # Dependencies
 node_modules/
@@ -13,6 +18,7 @@ node_modules/
 .env
 .env.local
 *.env.*
+!.env.example
 
 # Editors
 .vscode/
@@ -82,4 +88,3 @@ julia-*/
 
 # Zig
 zig*/
-```
