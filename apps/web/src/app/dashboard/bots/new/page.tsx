@@ -1,327 +1,539 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../../../lib/api';
+import { generateGridLevels, gridProfit, spacingInfo } from '../../../../lib/grid';
+import { fmtNum } from '../../../../lib/format';
+import { Button, Card, CardHeader, ErrorBanner } from '../../../../components/ui';
+import type { ExchangeAccountRow, MarketRow } from '../../../../lib/types';
 
-const GRID_TYPES = [
-  { value: 'ARITHMETIC', label: 'Arithmetic (Equal Spacing)' },
-  { value: 'GEOMETRIC', label: 'Geometric (Percentage Spacing)' },
-];
+const DEFAULT_FEE = '0.002'; // 0.2% assumed maker/taker for preview
 
-const INVENTORY_MODES = [
-  { value: 'EXISTING_ONLY', label: 'Use Existing Balance Only' },
-  { value: 'AUTO_REBALANCE', label: 'Auto Rebalance (Requires Market Orders)' },
-];
-
-const RANGE_EXIT_BEHAVIORS = [
-  { value: 'PAUSE_KEEP_ORDERS', label: 'Pause & Keep Orders' },
-  { value: 'PAUSE_CANCEL_ALL', label: 'Pause & Cancel All' },
-  { value: 'STOP_CANCEL_ALL', label: 'Stop & Cancel All' },
-  { value: 'RECENTER', label: 'Recenter Grid' },
+const RANGE_EXIT_OPTIONS = [
+  { value: 'PAUSE_KEEP_ORDERS', label: 'Pause & keep orders' },
+  { value: 'PAUSE_CANCEL_ALL', label: 'Pause & cancel all' },
+  { value: 'STOP_CANCEL_ALL', label: 'Stop & cancel all' },
+  { value: 'RECENTER', label: 'Recenter grid on price' },
+  { value: 'TRAILING', label: 'Trailing (shift range)' },
 ];
 
 export default function NewBotPage() {
-  const [formData, setFormData] = useState({
+  const router = useRouter();
+
+  const [form, setForm] = useState({
     name: '',
-    symbol: 'BTCUSDT',
-    gridType: 'ARITHMETIC',
+    symbol: '',
+    mode: 'DRY_RUN' as 'DRY_RUN' | 'LIVE',
+    exchangeAccountId: '',
+    gridType: 'ARITHMETIC' as 'ARITHMETIC' | 'GEOMETRIC',
     lowerPrice: '',
     upperPrice: '',
     gridCount: '10',
-    totalInvestmentQuote: '',
-    inventoryMode: 'EXISTING_ONLY',
-    onRangeExit: 'PAUSE_KEEP_ORDERS',
-    minProfitAfterFeesBps: '10',
+    totalInvestmentQuote: '100',
+    inventoryMode: 'AUTO_REBALANCE' as 'EXISTING_ONLY' | 'AUTO_REBALANCE' | 'MANUAL',
     makerOnly: true,
-    autoRecenter: false,
+    minProfitAfterFeesBps: '10',
+    onRangeExit: 'PAUSE_KEEP_ORDERS',
+    stopLossPrice: '',
+    takeProfitPrice: '',
+  });
+  const [symbolQuery, setSymbolQuery] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const { data: markets } = useQuery({
+    queryKey: ['markets'],
+    queryFn: async () => (await api.markets()).data as MarketRow[],
   });
 
-  const [gridPreview, setGridPreview] = useState<string[]>([]);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const { data: accounts } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: async () => (await api.accounts()).data as ExchangeAccountRow[],
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const filteredMarkets = useMemo(() => {
+    const list = (markets || []).filter((m) => m.isSpot !== false);
+    const q = symbolQuery.trim().toUpperCase();
+    if (!q) return list.slice(0, 50);
+    return list.filter((m) => m.symbol.includes(q) || m.baseAsset.includes(q)).slice(0, 50);
+  }, [markets, symbolQuery]);
+
+  const selectedMarket = useMemo(
+    () => (markets || []).find((m) => m.symbol === form.symbol),
+    [markets, form.symbol],
+  );
+
+  const ticker = useQuery({
+    queryKey: ['ticker', form.symbol],
+    queryFn: async () => (await api.ticker(form.symbol)).data,
+    enabled: Boolean(form.symbol) && !selectedMarket?.lastPrice,
+    refetchInterval: 30_000,
+  });
+
+  const currentPrice = useMemo(() => {
+    if (selectedMarket?.lastPrice) return String(selectedMarket.lastPrice);
+    return ticker.data?.lastPrice || '';
+  }, [selectedMarket, ticker.data]);
+
+  const precision = selectedMarket?.pricePrecision ?? 8;
+
+  const preview = useMemo(() => {
+    const lower = Number(form.lowerPrice);
+    const upper = Number(form.upperPrice);
+    const count = Number(form.gridCount);
+    if (!(lower > 0) || !(upper > 0) || lower >= upper || !(count >= 2)) return null;
+    try {
+      const levels = generateGridLevels({
+        gridType: form.gridType,
+        lowerPrice: form.lowerPrice,
+        upperPrice: form.upperPrice,
+        gridCount: count,
+        pricePrecision: precision,
+      });
+      const spacing = spacingInfo(levels, form.gridType);
+      const profit =
+        levels.length >= 2
+          ? gridProfit(levels[0].price, levels[1].price, DEFAULT_FEE, DEFAULT_FEE)
+          : null;
+      const perGrid =
+        Number(form.totalInvestmentQuote) > 0 ? Number(form.totalInvestmentQuote) / count : 0;
+      return { levels, spacing, profit, perGrid };
+    } catch {
+      return null;
+    }
+  }, [form.lowerPrice, form.upperPrice, form.gridCount, form.gridType, precision, form.totalInvestmentQuote]);
+
+  const minProfitBps = Number(form.minProfitAfterFeesBps) || 0;
+  const netPct = preview?.profit ? Number(preview.profit.netPct) : 0;
+  const profitTooLow = preview?.profit !== null && preview?.profit !== undefined && netPct < minProfitBps / 100;
+
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate form
-    const errors: string[] = [];
-    
-    if (!formData.name) errors.push('Bot name is required');
-    if (!formData.lowerPrice || parseFloat(formData.lowerPrice) <= 0) errors.push('Valid lower price is required');
-    if (!formData.upperPrice || parseFloat(formData.upperPrice) <= 0) errors.push('Valid upper price is required');
-    if (parseFloat(formData.lowerPrice) >= parseFloat(formData.upperPrice)) errors.push('Lower price must be less than upper price');
-    if (!formData.gridCount || parseInt(formData.gridCount) < 2) errors.push('Grid count must be at least 2');
-    if (!formData.totalInvestmentQuote || parseFloat(formData.totalInvestmentQuote) <= 0) errors.push('Valid investment amount is required');
+    setError('');
 
-    if (errors.length > 0) {
-      setValidationErrors(errors);
-      return;
+    if (!form.name.trim()) return setError('Bot name is required');
+    if (!form.symbol) return setError('Select a market symbol');
+    const lower = Number(form.lowerPrice);
+    const upper = Number(form.upperPrice);
+    if (!(lower > 0) || !(upper > 0) || lower >= upper)
+      return setError('Lower price must be positive and less than upper price');
+    if (Number(form.gridCount) < 2) return setError('Grid count must be at least 2');
+    if (form.mode === 'LIVE' && !form.exchangeAccountId)
+      return setError('Live bots require an exchange account');
+
+    setBusy(true);
+    try {
+      const res = await api.createBot({
+        name: form.name.trim(),
+        symbol: form.symbol,
+        strategyType: 'GRID',
+        mode: form.mode,
+        exchangeAccountId: form.exchangeAccountId || undefined,
+        gridConfig: {
+          gridType: form.gridType,
+          lowerPrice: form.lowerPrice,
+          upperPrice: form.upperPrice,
+          gridCount: Number(form.gridCount),
+          totalInvestmentQuote: form.totalInvestmentQuote || undefined,
+          inventoryMode: form.inventoryMode,
+          makerOnly: form.makerOnly,
+          minProfitAfterFeesBps: Number(form.minProfitAfterFeesBps) || 0,
+          onRangeExit: form.onRangeExit,
+          autoRecenter: form.onRangeExit === 'RECENTER',
+          stopLossPrice: form.stopLossPrice || undefined,
+          takeProfitPrice: form.takeProfitPrice || undefined,
+          allowMarketOrders: false,
+        },
+      });
+      router.push(`/dashboard/bots/${res.data?.id}`);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to create bot');
+      setBusy(false);
     }
-
-    // Calculate grid preview
-    const lower = parseFloat(formData.lowerPrice);
-    const upper = parseFloat(formData.upperPrice);
-    const count = parseInt(formData.gridCount);
-    const step = (upper - lower) / count;
-    
-    const levels = [];
-    for (let i = 0; i <= count; i++) {
-      levels.push((lower + i * step).toFixed(2));
-    }
-    setGridPreview(levels);
-    setValidationErrors([]);
-
-    // In a real app, this would submit to the API
-    console.log('Creating bot:', formData);
-    alert('Bot creation would be submitted to API here. This is a demo.');
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Create New Grid Bot</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Create Grid Bot</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Configure your grid trading strategy
+          Configure a spot grid strategy. Dry-run bots simulate fills locally; LIVE bots require
+          explicit enablement.
         </p>
       </div>
 
-      {/* Warning Banner */}
-      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <p className="text-sm text-yellow-700">
-              <strong className="font-medium">Paper Trading: </strong>
-              This bot will run in dry-run/paper mode. No real orders will be placed on Wallex Exchange.
-            </p>
-          </div>
-        </div>
-      </div>
+      {error && <ErrorBanner message={error} />}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Configuration */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Configuration</h3>
-          
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Bot Name</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-                placeholder="My First Grid Bot"
-              />
-            </div>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader title="1. Basics" />
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bot name</label>
+                <input
+                  value={form.name}
+                  onChange={(e) => set('name', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="BTCUSDT conservative grid"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Trading Pair</label>
-              <select
-                value={formData.symbol}
-                onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              >
-                <option value="BTCUSDT">BTC/USDT</option>
-                <option value="ETHUSDT">ETH/USDT</option>
-                <option value="BTCTMN">BTC/TMN</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Grid Type</label>
-              <select
-                value={formData.gridType}
-                onChange={(e) => setFormData({ ...formData, gridType: e.target.value as any })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              >
-                {GRID_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Inventory Mode</label>
-              <select
-                value={formData.inventoryMode}
-                onChange={(e) => setFormData({ ...formData, inventoryMode: e.target.value as any })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              >
-                {INVENTORY_MODES.map((mode) => (
-                  <option key={mode.value} value={mode.value}>
-                    {mode.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Grid Parameters */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Grid Parameters</h3>
-          
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Lower Price</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.lowerPrice}
-                onChange={(e) => setFormData({ ...formData, lowerPrice: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-                placeholder="50000"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Upper Price</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.upperPrice}
-                onChange={(e) => setFormData({ ...formData, upperPrice: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-                placeholder="70000"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Grid Count</label>
-              <input
-                type="number"
-                min="2"
-                max="100"
-                value={formData.gridCount}
-                onChange={(e) => setFormData({ ...formData, gridCount: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              />
-            </div>
-
-            <div className="md:col-span-3">
-              <label className="block text-sm font-medium text-gray-700">Total Investment (Quote Asset)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.totalInvestmentQuote}
-                onChange={(e) => setFormData({ ...formData, totalInvestmentQuote: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-                placeholder="1000"
-              />
-              <p className="mt-1 text-xs text-gray-500">Amount of quote asset (e.g., USDT) to allocate to this bot</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Advanced Settings */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Advanced Settings</h3>
-          
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Min Profit After Fees (bps)</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.minProfitAfterFeesBps}
-                onChange={(e) => setFormData({ ...formData, minProfitAfterFeesBps: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              />
-              <p className="mt-1 text-xs text-gray-500">Minimum profit in basis points after fees (100 bps = 1%)</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Range Exit Behavior</label>
-              <select
-                value={formData.onRangeExit}
-                onChange={(e) => setFormData({ ...formData, onRangeExit: e.target.value as any })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              >
-                {RANGE_EXIT_BEHAVIORS.map((behavior) => (
-                  <option key={behavior.value} value={behavior.value}>
-                    {behavior.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.makerOnly}
-                onChange={(e) => setFormData({ ...formData, makerOnly: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label className="ml-2 block text-sm text-gray-900">Maker Orders Only</label>
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.autoRecenter}
-                onChange={(e) => setFormData({ ...formData, autoRecenter: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label className="ml-2 block text-sm text-gray-900">Enable Auto Recenter</label>
-            </div>
-          </div>
-        </div>
-
-        {/* Validation Errors */}
-        {validationErrors.length > 0 && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-            <ul className="list-disc list-inside text-sm text-red-700">
-              {validationErrors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Grid Preview */}
-        {gridPreview.length > 0 && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Grid Levels Preview</h3>
-            <div className="grid grid-cols-5 gap-2">
-              {gridPreview.map((level, index) => (
-                <div key={index} className="text-center p-2 bg-gray-50 rounded">
-                  <div className="text-xs text-gray-500">Level {index}</div>
-                  <div className="font-mono text-sm">{level}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Trading mode
+                  </label>
+                  <select
+                    value={form.mode}
+                    onChange={(e) => set('mode', e.target.value as 'DRY_RUN' | 'LIVE')}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="DRY_RUN">DRY RUN (paper trading)</option>
+                    <option value="LIVE">LIVE (real orders)</option>
+                  </select>
+                  {form.mode === 'LIVE' && (
+                    <p className="mt-1 text-xs text-red-600">
+                      Live trading is blocked unless the environment flag, global risk setting, and
+                      account live flag are all enabled.
+                    </p>
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Exchange account {form.mode === 'LIVE' ? '(required)' : '(optional)'}
+                  </label>
+                  <select
+                    value={form.exchangeAccountId}
+                    onChange={(e) => set('exchangeAccountId', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="">— none —</option>
+                    {(accounts || []).map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.apiKeyMasked}){a.isLiveEnabled ? ' · LIVE' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {(accounts || []).length === 0 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      No accounts yet.{' '}
+                      <Link href="/dashboard/exchange" className="text-blue-600 hover:underline">
+                        Add one
+                      </Link>{' '}
+                      to track balances or trade live.
+                    </p>
+                  )}
+                </div>
+              </div>
 
-        {/* Submit Buttons */}
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Create Bot (Dry Run)
-          </button>
-          <Link
-            href="/dashboard/bots"
-            className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Cancel
-          </Link>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Market</label>
+                <input
+                  value={symbolQuery}
+                  onChange={(e) => setSymbolQuery(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="Filter markets, e.g. BTC or USDT…"
+                />
+                <select
+                  value={form.symbol}
+                  onChange={(e) => set('symbol', e.target.value)}
+                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  size={6}
+                >
+                  <option value="">— select market —</option>
+                  {filteredMarkets.map((m) => (
+                    <option key={m.symbol} value={m.symbol}>
+                      {m.symbol} — {m.baseAsset}/{m.quoteAsset}
+                      {m.lastPrice ? ` @ ${fmtNum(m.lastPrice, 6)}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedMarket && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    price precision {selectedMarket.pricePrecision} · amount precision{' '}
+                    {selectedMarket.amountPrecision}
+                    {selectedMarket.minNotional ? ` · min notional ${fmtNum(selectedMarket.minNotional)}` : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="2. Grid parameters" />
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Grid type</label>
+                  <select
+                    value={form.gridType}
+                    onChange={(e) => set('gridType', e.target.value as 'ARITHMETIC' | 'GEOMETRIC')}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="ARITHMETIC">Arithmetic (equal spacing)</option>
+                    <option value="GEOMETRIC">Geometric (equal %)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Grid count</label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={100}
+                    value={form.gridCount}
+                    onChange={(e) => set('gridCount', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Investment ({selectedMarket?.quoteAsset || 'quote'})
+                  </label>
+                  <input
+                    value={form.totalInvestmentQuote}
+                    onChange={(e) => set('totalInvestmentQuote', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="Total quote amount"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lower price</label>
+                  <input
+                    value={form.lowerPrice}
+                    onChange={(e) => set('lowerPrice', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Upper price</label>
+                  <input
+                    value={form.upperPrice}
+                    onChange={(e) => set('upperPrice', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {currentPrice && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  Current price: <strong>{fmtNum(currentPrice, 6)}</strong>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const p = Number(currentPrice);
+                      if (p > 0) {
+                        set('lowerPrice', (p * 0.95).toPrecision(6));
+                        set('upperPrice', (p * 1.05).toPrecision(6));
+                      }
+                    }}
+                  >
+                    ±5% around price
+                  </Button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Inventory mode</label>
+                  <select
+                    value={form.inventoryMode}
+                    onChange={(e) =>
+                      set('inventoryMode', e.target.value as 'EXISTING_ONLY' | 'AUTO_REBALANCE' | 'MANUAL')
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="AUTO_REBALANCE">Auto rebalance</option>
+                    <option value="EXISTING_ONLY">Existing balance only</option>
+                    <option value="MANUAL">Manual amounts</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Min profit/grid (bps)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.minProfitAfterFeesBps}
+                    onChange={(e) => set('minProfitAfterFeesBps', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">On range exit</label>
+                  <select
+                    value={form.onRangeExit}
+                    onChange={(e) => set('onRangeExit', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    {RANGE_EXIT_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Stop-loss price <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    value={form.stopLossPrice}
+                    onChange={(e) => set('stopLossPrice', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Take-profit price <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    value={form.takeProfitPrice}
+                    onChange={(e) => set('takeProfitPrice', e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.makerOnly}
+                      onChange={(e) => set('makerOnly', e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Maker-only orders
+                  </label>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Grid preview" />
+            <div className="p-6 space-y-4 text-sm">
+              {!preview ? (
+                <p className="text-gray-500">
+                  Enter a valid lower price, upper price, and grid count to preview the levels.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">Levels</p>
+                      <p className="font-semibold">{preview.levels.length}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">Per-grid quote</p>
+                      <p className="font-semibold">{fmtNum(preview.perGrid, 4)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">Avg spacing</p>
+                      <p className="font-semibold">{preview.spacing.avgSpacingPct}%</p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">Net profit/grid</p>
+                      <p
+                        className={`font-semibold ${
+                          preview.profit?.isProfitable ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {preview.profit?.netPct}%
+                      </p>
+                    </div>
+                  </div>
+
+                  {preview.profit && !preview.profit.isProfitable && (
+                    <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded text-red-700">
+                      Grid spacing is smaller than round-trip fees (assumed 0.4%). This grid will
+                      lose money per cycle.
+                    </div>
+                  )}
+                  {profitTooLow && preview.profit?.isProfitable && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded text-yellow-700">
+                      Net profit/grid is below your configured minimum of {minProfitBps} bps.
+                    </div>
+                  )}
+                  {currentPrice &&
+                    (Number(currentPrice) < Number(form.lowerPrice) ||
+                      Number(currentPrice) > Number(form.upperPrice)) && (
+                      <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded text-blue-700">
+                        Current price is outside the grid range; orders will only be placed once
+                        the price enters the range.
+                      </div>
+                    )}
+
+                  <div className="max-h-64 overflow-y-auto border rounded">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-gray-50 text-left text-gray-500">
+                        <tr>
+                          <th className="px-3 py-1.5">#</th>
+                          <th className="px-3 py-1.5 text-right">Price</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {[...preview.levels].reverse().map((lvl) => (
+                          <tr
+                            key={lvl.levelIndex}
+                            className={
+                              currentPrice &&
+                              Number(lvl.price) <= Number(currentPrice) &&
+                              lvl.levelIndex ===
+                                preview.levels.reduce(
+                                  (best, l) =>
+                                    Number(l.price) <= Number(currentPrice) &&
+                                    Number(l.price) > Number(best.price)
+                                      ? l
+                                      : best,
+                                  preview.levels[0],
+                                ).levelIndex
+                                ? 'bg-yellow-50'
+                                : ''
+                            }
+                          >
+                            <td className="px-3 py-1">{lvl.levelIndex}</td>
+                            <td className="px-3 py-1 text-right font-mono">{lvl.price}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
+
+          <div className="flex gap-3">
+            <Button type="submit" disabled={busy} variant="primary">
+              {busy ? 'Creating…' : 'Create bot'}
+            </Button>
+            <Link
+              href="/dashboard/bots"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+            >
+              Cancel
+            </Link>
+          </div>
         </div>
       </form>
     </div>
-  );
-}
-
-function Link({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
-  return (
-    <a href={href} className={className}>
-      {children}
-    </a>
   );
 }

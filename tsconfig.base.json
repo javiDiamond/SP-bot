@@ -18,17 +18,7 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "composite": true,
-    "incremental": true,
-    "baseUrl": ".",
-    "paths": {
-      "@wallex/shared": ["packages/shared/src/index.ts"],
-      "@wallex/db": ["packages/db/src/index.ts"],
-      "@wallex/exchange": ["packages/exchange/src/index.ts"],
-      "@wallex/grid-strategy": ["packages/grid-strategy/src/index.ts"],
-      "@wallex/backtester": ["packages/backtester/src/index.ts"]
-    }
+    "sourceMap": true
   },
   "exclude": ["node_modules", "dist"]
 }

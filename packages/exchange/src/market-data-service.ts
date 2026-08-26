@@ -11,7 +11,7 @@
 import EventEmitter from 'events';
 import pino from 'pino';
 import { WallexRestClient, WallexDepth } from './rest-client';
-import { WallexWebSocketClient, PriceUpdate, DepthUpdate } from './ws-client';
+import { WallexWebSocketClient, PriceUpdate, DepthUpdate, TradeUpdate } from './ws-client';
 
 // ============================================================================
 // Types
@@ -95,6 +95,10 @@ export class MarketDataService extends EventEmitter {
       this.updateDepth(update);
     });
 
+    this.config.wsClient.on('trade.update', (update: TradeUpdate) => {
+      this.updateTrade(update);
+    });
+
     this.config.wsClient.on('ws.disconnected', () => {
       logger.warn('WebSocket disconnected, falling back to REST polling');
       // Ensure all active symbols are being polled
@@ -107,6 +111,10 @@ export class MarketDataService extends EventEmitter {
 
     this.config.wsClient.on('ws.connected', () => {
       logger.info('WebSocket connected, switching to real-time updates');
+      // Resubscribe the global price channel if any symbols are tracked
+      if (this.subscribedSymbols.size > 0) {
+        this.config.wsClient.subscribeAllPrices();
+      }
       // Stop REST polling for subscribed symbols
       this.subscribedSymbols.forEach(symbol => {
         this.stopPolling(symbol);
@@ -128,6 +136,7 @@ export class MarketDataService extends EventEmitter {
 
     // Try WebSocket first
     if (this.config.wsClient && this.config.wsClient.connected) {
+      this.config.wsClient.subscribeAllPrices();
       this.config.wsClient.subscribeTrades(symbol);
       this.config.wsClient.subscribeBuyDepth(symbol);
       this.config.wsClient.subscribeSellDepth(symbol);
@@ -240,6 +249,9 @@ export class MarketDataService extends EventEmitter {
    * Update price from WebSocket or REST
    */
   private updatePrice(update: PriceUpdate): void {
+    // all@price broadcasts EVERY symbol; ignore anything we don't track
+    if (!this.subscribedSymbols.has(update.symbol)) return;
+
     const existing = this.marketData.get(update.symbol);
 
     const newData: MarketData = {
@@ -259,6 +271,31 @@ export class MarketDataService extends EventEmitter {
     this.emit('price.update', newData);
 
     logger.debug({ symbol: update.symbol, price: update.price }, 'Price updated');
+  }
+
+  /**
+   * Update last price from a trade tick
+   */
+  private updateTrade(update: TradeUpdate): void {
+    if (!this.subscribedSymbols.has(update.symbol)) return;
+
+    const existing = this.marketData.get(update.symbol);
+
+    const newData: MarketData = {
+      symbol: update.symbol,
+      price: update.price,
+      bid: existing?.bid,
+      ask: existing?.ask,
+      high24h: existing?.high24h,
+      low24h: existing?.low24h,
+      volume24h: existing?.volume24h,
+      change24h: existing?.change24h,
+      lastUpdate: Date.now(),
+      source: 'websocket',
+    };
+
+    this.marketData.set(update.symbol, newData);
+    this.emit('price.update', newData);
   }
 
   /**
@@ -336,9 +373,16 @@ export class MarketDataService extends EventEmitter {
 
       const existing = this.marketData.get(symbol);
 
+      let price = existing?.price || '';
+      if (bestBid && bestAsk) {
+        price = String((Number(bestBid) + Number(bestAsk)) / 2);
+      } else if (bestBid || bestAsk) {
+        price = bestBid || bestAsk || price;
+      }
+
       const newData: MarketData = {
         symbol,
-        price: bestBid || bestAsk || existing?.price || '',
+        price,
         bid: bestBid,
         ask: bestAsk,
         high24h: existing?.high24h,

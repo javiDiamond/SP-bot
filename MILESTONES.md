@@ -463,31 +463,71 @@ The project is complete when:
 
 - [x] All files in `/docs` have been read and understood
 - [x] `docs/ASSUMPTIONS.md` exists and documents unclear items
-- [ ] The app starts with Docker Compose
-- [ ] Admin can log in
-- [ ] User can add a Wallex exchange account in dry-run mode
-- [ ] Markets can be fetched and filtered to spot markets
-- [ ] User can create a grid bot config
-- [ ] Grid math is validated and fee-aware
-- [ ] Dry-run bot can start and simulate orders/fills
-- [ ] Dashboard shows realtime bot state, orders, fills, PnL, and logs
-- [ ] Bot can be paused/resumed/stopped
-- [ ] Cancel-all works
-- [ ] Kill switch works
-- [ ] Backtest can run using candle data
-- [ ] Backtest results are stored and displayed
-- [ ] Multiple backtests can be compared
-- [ ] Live trading is blocked unless explicitly enabled
-- [ ] Live order placement uses rate limiting and client order IDs
-- [ ] REST polling fallback works when WebSocket is unavailable
-- [ ] Tests pass for critical grid, order, fee, and backtest logic
-- [ ] README explains setup, risks, deployment, and live-trading warnings
-- [ ] No secrets are logged or exposed
+- [x] The app starts with Docker Compose (full stack verified: postgres/redis healthy, api migrates+seeds on boot and passes healthcheck, worker picks up bot commands, web serves login; dry-run bot reached RUNNING with live-price grid orders, range-exit pause and clean STOP confirmed)
+- [x] Admin can log in
+- [x] User can add a Wallex exchange account in dry-run mode
+- [x] Markets can be fetched and filtered to spot markets
+- [x] User can create a grid bot config
+- [x] Grid math is validated and fee-aware
+- [x] Dry-run bot can start and simulate orders/fills
+- [x] Dashboard shows realtime bot state, orders, fills, PnL, and logs
+- [x] Bot can be paused/resumed/stopped
+- [x] Cancel-all works
+- [x] Kill switch works
+- [x] Backtest can run using candle data
+- [x] Backtest results are stored and displayed
+- [x] Multiple backtests can be compared
+- [x] Live trading is blocked unless explicitly enabled
+- [x] Live order placement uses rate limiting and client order IDs
+- [x] REST polling fallback works when WebSocket is unavailable
+- [x] Tests pass for critical grid, order, fee, and backtest logic (grid math, fees/min-profit, paper-exchange fills, grid-engine lifecycle incl. partial fills + kill-switch + range exits, reconciliation orphan policy, API integration via fastify.inject)
+- [x] README explains setup, risks, deployment, and live-trading warnings
+- [x] No secrets are logged or exposed
 
 ---
 
 ## Current Status
 
-**Completed**: Project scaffolding, package structure, core types, Prisma schema, grid math utilities, partial exchange adapter structure.
+**Completed** (verified against the remediation plan `.kilo/plans/1787574960799-jolly-eagle.md`):
 
-**Next**: Milestone 1 - Complete database setup with migrations and seed data.
+- **Phase 0 — Foundation:** workspace builds to `dist/`, single init migration committed, seed runs, `.env.example` fixed, build artifacts untracked.
+- **Phase 1 — API:** bcryptjs auth (login/register/me), JWT guards on all route groups, field-correct routes, BullMQ producers behind `lib/queue.ts`, SSE `/api/stream` (incl. `?token=` for EventSource), audit logging, kill-switch + reconciliation + markets/candle endpoints.
+- **Phase 2 — Exchange adapter:** `WallexExchange` implements `ExchangePort` (paper + live), REST/WS client fixes, maker-fill paper exchange, `cancelAllOrders`, stale-price guard.
+- **Phase 3 — Grid engine + worker:** `GridEngine` is the single exchange-agnostic state machine driven through `ExchangePort`; worker is a thin driver with Redis lock, reconciliation, pre-trade risk service, PnL snapshots, realtime publisher, market-data sync.
+- **Phase 4 — Backtesting:** single `CandleBasedBacktester` drives `GridEngine` over ingested candles; metrics/equity/benchmark persisted; trades, CSV export, compare, and optimization endpoints live.
+- **Phase 5 — Dashboard (this pass):** real login + auth guard, SSE-driven live updates, overview/bots/bot-detail/backtests (+detail+compare)/orders+fills/balances/exchange/settings/logs all wired to the API; lightweight-charts price + grid overlay; recharts equity curve; bot wizard with live grid preview + fee-aware warnings; kill-switch banner + toggle; CSV exports.
+
+**Verified end-to-end (smoke test against live Wallex data):**
+
+- Admin login → 401 without token, 200 with.
+- Dry-run bot resume → STARTING → RUNNING; grid levels placed; a buy fill at live price; PnL + snapshots written; pause → PAUSED; stop → STOPPED with all orders cancelled.
+- Backtest created → PENDING → auto-ingests candles → COMPLETED with metrics, equity curve, trades, warnings; second run produced 33 trades / 15 grid cycles / fee-aware PnL.
+- Compare (2 runs), trades CSV export, kill-switch on/off (persisted + audited), live-trading gate rejects LIVE while `ENABLE_LIVE_TRADING=false`.
+
+**Phase 6 — hardening (this pass):**
+
+- Dashboard + SSE token-auth work merged from the `thrilling-bank` worktree into the main workspace; `next build` passes (all 15 routes incl. `/login`, bot detail, backtest detail/compare, logs).
+- Test suite expanded from 11 → 87 tests, all green:
+  - `@wallex/shared`: grid math (arithmetic/geometric generation, precision rounding, fee-aware profit validation, quantities, range/nearest-level helpers), AES-256-GCM encrypt/decrypt round-trip + tamper detection, client order id format/uniqueness.
+  - `@wallex/exchange`: paper exchange — balance locking, maker fills at limit price, base/quote-denominated fees, min-notional + insufficient-balance rejection, duplicate clientOrderId idempotency, cancel-unlock, stop-market triggers, same-tick fill dedupe, balance snapshot round-trip.
+  - `@wallex/grid-strategy`: grid engine lifecycle against a fake ExchangePort — initial placement below price, buy→sell pairing, sell→buy re-arm + realized PnL/cycles, partial fills with cumulative-event dedupe (no fee double counting), pre-trade kill-switch gate, max-open-orders, balance skips, STOP_CANCEL_ALL / PAUSE_KEEP_ORDERS range exits, stop-loss/take-profit, cancel-all.
+  - worker: `diffOpenOrders` reconciliation policy (orphans never canceled; missing resolved via lookup).
+  - `@wallex/api`: 15 `fastify.inject` integration tests against real Postgres/Redis — auth (register first user ADMIN, login, /me, 401s), dry-run account creation + key masking (no raw key in responses), bot CRUD incl. inverted-range rejection, LIVE gate (`ENABLE_LIVE_TRADING=false` blocks LIVE bots and `allowLiveTrading`), lifecycle transitions (START→STARTING, 409 on invalid), kill switch toggle + audit logs + force-KILL of running bots. Suite is hermetic (dedicated `wallex_grid_bot_test` DB, truncated in beforeAll) and self-skips when Postgres/Redis are unreachable.
+- GridEngine bug fixes found via the new tests:
+  - Partial fills: the buy order id was consumed on the first fill event, so subsequent partial-fill updates were dropped; fills now resolve through a placement index and stay `BUY_PARTIALLY_FILLED` until the order's full quantity is recorded.
+  - Cumulative WS fill events previously double-counted fees; recorded qty is now skipped before fee/cost accumulation.
+  - Sell fills decrement `openSellQuantity`; partial sells get `SELL_PARTIALLY_FILLED`.
+- API refactored into a `buildApp()` factory (`src/app.ts`) consumed by both `index.ts` and the integration tests.
+- Seed: fixed invalid 16-byte `ENCRYPTION_KEY` fallback (now valid 64-hex).
+- Docker (verified end-to-end with `docker compose build && up`):
+  - `.dockerignore` added (node_modules/dist/.next/.turbo/generated/.env excluded).
+  - `ENCRYPTION_KEY` compose default is now a valid 64-hex dev key; `ADMIN_EMAIL`/`ADMIN_PASSWORD` passed to the api for seed-on-boot.
+  - api CMD: `db:migrate && db:seed && node apps/api/dist/index.js` (node directly — turbo sanitizes env in containers); healthchecks on api (`:4000/health`) and worker (`:4001/health`); web/worker wait for `api: service_healthy`.
+  - Dockerfile.worker rewritten (broken `COPY packages/*/package.json` flatten fixed; turbo graph build), Dockerfile.web fixed (`@wallex-grid/web` filter name, full workspace manifests, prisma schema for db:generate), all images copy `tsconfig.base.json` and install `libc6-compat`+`openssl` for the Prisma engines on musl.
+  - Compose smoke test: admin login on the containerized API, dry-run bot START→RUNNING with 7 levels and 3 live-priced buy orders, grid range-exit pause at stale-range price, STOP→STOPPED with order cancellation.
+
+**Remaining (optional polish):**
+
+- Load testing, log rotation, alert thresholds.
+
+**Note:** This sandbox has a transparent secret-scrubber that rewrites JWT-looking values in URL *query strings* (not headers) to `***` in transit. Header-based auth is unaffected; the SSE `?token=` path works in normal deployment but cannot be exercised end-to-end here.

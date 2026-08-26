@@ -1,12 +1,12 @@
 /**
  * Paper Exchange Simulator
- * 
+ *
  * Simulates Wallex exchange for dry-run/paper trading:
- * - Simulated balances
- * - Simulated order placement and matching
- * - Simulated fills based on market price
- * - Fee calculation
- * - Order history tracking
+ * - Simulated balances with locking
+ * - Maker-style fills driven by price ticks (updatePrice)
+ * - Fee calculation (maker/taker, BUY fee in base asset, SELL fee in quote)
+ * - STOP_LIMIT / STOP_MARKET trigger on stop price cross
+ * - Order history + fill tracking, event emission
  */
 
 import EventEmitter from 'events';
@@ -37,6 +37,7 @@ export interface PaperOrder {
   createdAt: number;
   updatedAt: number;
   stopPrice?: Decimal;
+  stopTriggered: boolean;
 }
 
 export interface PaperFill {
@@ -59,6 +60,8 @@ export interface PaperExchangeConfig {
   minNotional?: string;
 }
 
+const QUOTE_ASSETS = ['USDT', 'TMN', 'IRT', 'BTC', 'ETH'];
+
 // ============================================================================
 // Logger
 // ============================================================================
@@ -78,7 +81,7 @@ export class PaperExchange extends EventEmitter {
 
   constructor(config: PaperExchangeConfig = {}) {
     super();
-    
+
     this.config = {
       initialBalances: config.initialBalances || {
         USDT: '10000',
@@ -91,8 +94,13 @@ export class PaperExchange extends EventEmitter {
       minNotional: config.minNotional || '1',
     };
 
-    // Initialize balances
-    Object.entries(this.config.initialBalances).forEach(([asset, amount]) => {
+    this.applyInitialBalances(this.config.initialBalances);
+
+    logger.info({ balances: this.config.initialBalances }, 'Paper exchange initialized');
+  }
+
+  private applyInitialBalances(initial: Record<string, string>): void {
+    Object.entries(initial).forEach(([asset, amount]) => {
       const decAmount = new Decimal(amount);
       this.balances.set(asset, {
         asset,
@@ -101,35 +109,105 @@ export class PaperExchange extends EventEmitter {
         total: decAmount,
       });
     });
-
-    logger.info({ balances: this.config.initialBalances }, 'Paper exchange initialized');
   }
 
+  // ==========================================================================
+  // State management
+  // ==========================================================================
+
+  /** Replace balances from persisted state (e.g. BalanceSnapshot rows). */
+  loadBalances(state: Record<string, { available: string; locked: string }>): void {
+    this.balances.clear();
+    Object.entries(state).forEach(([asset, b]) => {
+      const available = new Decimal(b.available);
+      const locked = new Decimal(b.locked);
+      this.balances.set(asset, {
+        asset,
+        available,
+        locked,
+        total: available.plus(locked),
+      });
+    });
+  }
+
+  /** Snapshot current balances for persistence. */
+  snapshotBalances(): Record<string, { available: string; locked: string; total: string }> {
+    const out: Record<string, { available: string; locked: string; total: string }> = {};
+    this.balances.forEach((b, asset) => {
+      out[asset] = {
+        available: b.available.toString(),
+        locked: b.locked.toString(),
+        total: b.total.toString(),
+      };
+    });
+    return out;
+  }
+
+  setFeeRates(maker: string, taker: string): void {
+    this.config.makerFeeRate = maker;
+    this.config.takerFeeRate = taker;
+  }
+
+  // ==========================================================================
+  // Market data feed
+  // ==========================================================================
+
   /**
-   * Update current market price for a symbol
+   * Update current market price for a symbol.
+   * Drives maker fills for resting orders and STOP triggers.
    */
   updatePrice(symbol: string, price: string): void {
-    this.currentPrices.set(symbol, new Decimal(price));
+    const priceDec = new Decimal(price);
+    const prev = this.currentPrices.get(symbol);
+    this.currentPrices.set(symbol, priceDec);
     logger.debug({ symbol, price }, 'Price updated');
+
+    this.evaluateOrders(symbol, priceDec, prev);
   }
 
-  /**
-   * Get current price for a symbol
-   */
+  /** Evaluate resting orders against a new price tick. */
+  private evaluateOrders(symbol: string, price: Decimal, prevPrice?: Decimal): void {
+    for (const order of Array.from(this.orders.values())) {
+      if (order.symbol !== symbol) continue;
+      if (order.status !== 'NEW' && order.status !== 'PARTIALLY_FILLED') continue;
+
+      // STOP trigger handling
+      if (
+        (order.type === 'STOP_LIMIT' || order.type === 'STOP_MARKET') &&
+        !order.stopTriggered &&
+        order.stopPrice
+      ) {
+        const triggered =
+          order.side === 'BUY' ? price.gte(order.stopPrice) : price.lte(order.stopPrice);
+        if (!triggered) continue;
+        order.stopTriggered = true;
+        logger.info(
+          { clientOrderId: order.clientOrderId, stopPrice: order.stopPrice.toString() },
+          'Stop order triggered',
+        );
+        this.emit('order.update', this.orderToWallexResponse(order));
+      }
+
+      if ((order.type === 'STOP_LIMIT' || order.type === 'STOP_MARKET') && !order.stopTriggered) {
+        continue;
+      }
+
+      this.tryFillOrder(order, price, prevPrice);
+    }
+  }
+
   getPrice(symbol: string): Decimal | undefined {
     return this.currentPrices.get(symbol);
   }
 
-  /**
-   * Get balance for an asset
-   */
+  // ==========================================================================
+  // Balances
+  // ==========================================================================
+
   getBalance(asset: string): PaperBalance | undefined {
     return this.balances.get(asset);
   }
 
-  /**
-   * Get all balances
-   */
   getBalances(): Record<string, WallexBalance> {
     const result: Record<string, WallexBalance> = {};
 
@@ -147,25 +225,28 @@ export class PaperExchange extends EventEmitter {
     return result;
   }
 
-  /**
-   * Create order
-   */
+  // ==========================================================================
+  // Orders
+  // ==========================================================================
+
   async createOrder(request: WallexOrderRequest): Promise<WallexOrderResponse> {
     const { symbol, side, type, price, quantity, client_id } = request;
 
     logger.info({ symbol, side, type, price, quantity, client_id }, 'Creating paper order');
 
-    // Parse values
+    if (this.orders.has(client_id ?? '')) {
+      // Duplicate clientOrderId — idempotent return of existing order
+      return this.orderToWallexResponse(this.orders.get(client_id!)!);
+    }
+
     const priceDec = new Decimal(price);
     const quantityDec = new Decimal(quantity);
     const notional = priceDec.times(quantityDec);
 
-    // Validate minimum notional
     if (notional.lt(this.config.minNotional)) {
       throw new Error(`Order notional ${notional} below minimum ${this.config.minNotional}`);
     }
 
-    // Check balances
     if (side === 'BUY') {
       const quoteAsset = this.extractQuoteAsset(symbol);
       const balance = this.balances.get(quoteAsset);
@@ -174,7 +255,6 @@ export class PaperExchange extends EventEmitter {
         throw new Error(`Insufficient ${quoteAsset} balance`);
       }
 
-      // Lock quote balance
       balance.available = balance.available.minus(notional);
       balance.locked = balance.locked.plus(notional);
     } else {
@@ -185,14 +265,13 @@ export class PaperExchange extends EventEmitter {
         throw new Error(`Insufficient ${baseAsset} balance`);
       }
 
-      // Lock base balance
       balance.available = balance.available.minus(quantityDec);
       balance.locked = balance.locked.plus(quantityDec);
     }
 
-    // Create order
-    const orderId = client_id || `PAPER_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    
+    const orderId =
+      client_id || `PAPER_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
     const order: PaperOrder = {
       clientOrderId: orderId,
       symbol,
@@ -205,22 +284,24 @@ export class PaperExchange extends EventEmitter {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       stopPrice: request.stop_Price ? new Decimal(request.stop_Price) : undefined,
+      stopTriggered: type === 'LIMIT' || type === 'MARKET',
     };
 
     this.orders.set(orderId, order);
     this.emit('order.created', order);
+    this.emit('order.update', this.orderToWallexResponse(order));
 
     logger.info({ orderId, status: order.status }, 'Order created');
 
     // Try to fill immediately if market order or if price crosses current market
-    await this.tryFillOrder(order);
+    const currentPrice = this.currentPrices.get(symbol);
+    if (currentPrice && order.stopTriggered) {
+      this.tryFillOrder(order, currentPrice);
+    }
 
     return this.orderToWallexResponse(order);
   }
 
-  /**
-   * Cancel order
-   */
   async cancelOrder(clientOrderId: string): Promise<WallexOrderResponse> {
     const order = this.orders.get(clientOrderId);
 
@@ -233,8 +314,19 @@ export class PaperExchange extends EventEmitter {
     }
 
     logger.info({ clientOrderId }, 'Canceling order');
+    this.unlockRemaining(order);
 
-    // Unlock remaining balance
+    order.status = 'CANCELED';
+    order.updatedAt = Date.now();
+
+    this.emit('order.canceled', order);
+    this.emit('order.update', this.orderToWallexResponse(order));
+    logger.info({ clientOrderId }, 'Order canceled');
+
+    return this.orderToWallexResponse(order);
+  }
+
+  private unlockRemaining(order: PaperOrder): void {
     const remainingQty = order.quantity.minus(order.executedQty);
     const remainingValue = remainingQty.times(order.price);
 
@@ -242,30 +334,19 @@ export class PaperExchange extends EventEmitter {
       const quoteAsset = this.extractQuoteAsset(order.symbol);
       const balance = this.balances.get(quoteAsset);
       if (balance) {
-        balance.locked = balance.locked.minus(remainingValue);
+        balance.locked = Decimal.max(balance.locked.minus(remainingValue), new Decimal(0));
         balance.available = balance.available.plus(remainingValue);
       }
     } else {
       const baseAsset = this.extractBaseAsset(order.symbol);
       const balance = this.balances.get(baseAsset);
       if (balance) {
-        balance.locked = balance.locked.minus(remainingQty);
+        balance.locked = Decimal.max(balance.locked.minus(remainingQty), new Decimal(0));
         balance.available = balance.available.plus(remainingQty);
       }
     }
-
-    order.status = 'CANCELED';
-    order.updatedAt = Date.now();
-
-    this.emit('order.canceled', order);
-    logger.info({ clientOrderId }, 'Order canceled');
-
-    return this.orderToWallexResponse(order);
   }
 
-  /**
-   * Get order by client ID
-   */
   async getOrder(clientOrderId: string): Promise<WallexOrderResponse> {
     const order = this.orders.get(clientOrderId);
 
@@ -276,12 +357,10 @@ export class PaperExchange extends EventEmitter {
     return this.orderToWallexResponse(order);
   }
 
-  /**
-   * Get open orders
-   */
   async getOpenOrders(symbol?: string): Promise<Record<string, WallexOrderResponse[]>> {
-    const openOrders = Array.from(this.orders.values())
-      .filter(o => o.status === 'NEW' || o.status === 'PARTIALLY_FILLED');
+    const openOrders = Array.from(this.orders.values()).filter(
+      o => o.status === 'NEW' || o.status === 'PARTIALLY_FILLED',
+    );
 
     const result: Record<string, WallexOrderResponse[]> = {};
 
@@ -297,58 +376,67 @@ export class PaperExchange extends EventEmitter {
     return result;
   }
 
-  /**
-   * Get fills for an order
-   */
   getFills(clientOrderId: string): PaperFill[] {
     return this.fills.filter(f => f.clientOrderId === clientOrderId);
   }
 
-  /**
-   * Get all fills
-   */
   getAllFills(): PaperFill[] {
     return [...this.fills];
   }
 
+  getFillsSince(timestamp: number): PaperFill[] {
+    return this.fills.filter(f => f.timestamp >= timestamp);
+  }
+
+  // ==========================================================================
+  // Fill simulation
+  // ==========================================================================
+
   /**
-   * Try to fill an order based on current market price
+   * Attempt to fill an order against a market price.
+   * Maker model: resting LIMIT BUY fills when tick price <= limit price,
+   * resting LIMIT SELL fills when tick price >= limit price.
+   * MARKET orders fill at the current tick price.
    */
-  private async tryFillOrder(order: PaperOrder): Promise<void> {
-    const currentPrice = this.currentPrices.get(order.symbol);
-
-    if (!currentPrice) {
-      logger.debug({ orderId: order.clientOrderId }, 'No price available for fill simulation');
-      return;
-    }
-
+  private tryFillOrder(order: PaperOrder, marketPrice: Decimal, prevPrice?: Decimal): void {
     let shouldFill = false;
+    let fillPrice: Decimal;
 
-    // Determine if order should fill
-    if (order.type === 'MARKET') {
+    if (order.type === 'MARKET' || order.type === 'STOP_MARKET') {
       shouldFill = true;
-    } else if (order.side === 'BUY' && currentPrice.lte(order.price)) {
-      // Buy limit fills if market price <= order price
-      shouldFill = true;
-    } else if (order.side === 'SELL' && currentPrice.gte(order.price)) {
-      // Sell limit fills if market price >= order price
-      shouldFill = true;
+      fillPrice = marketPrice;
+    } else {
+      fillPrice = order.price;
+      if (order.side === 'BUY') {
+        shouldFill = marketPrice.lte(order.price);
+      } else {
+        shouldFill = marketPrice.gte(order.price);
+      }
     }
 
-    if (!shouldFill) {
+    if (!shouldFill) return;
+
+    // Never fill a resting limit below/above the previous tick direction guard
+    if (prevPrice && order.type === 'LIMIT' && prevPrice.equals(marketPrice)) {
+      // no price movement — nothing new to cross
       return;
     }
 
-    // Calculate fill
     const remainingQty = order.quantity.minus(order.executedQty);
-    const fillPrice = order.type === 'MARKET' ? currentPrice : order.price;
-    const isMaker = order.type === 'LIMIT' && !order.type.includes('MARKET');
-    
-    const feeRate = isMaker 
+    if (remainingQty.lte(0)) return;
+
+    // Maker if order was resting (price move reached it); taker for market/stop.
+    const isMaker = order.type === 'LIMIT';
+
+    const feeRate = isMaker
       ? new Decimal(this.config.makerFeeRate)
       : new Decimal(this.config.takerFeeRate);
 
-    // Create fill
+    const notional = fillPrice.times(remainingQty);
+    const fee = notional.times(feeRate);
+    const feeAsset =
+      order.side === 'BUY' ? this.extractBaseAsset(order.symbol) : this.extractQuoteAsset(order.symbol);
+
     const fill: PaperFill = {
       fillId: `FILL_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       clientOrderId: order.clientOrderId,
@@ -356,65 +444,86 @@ export class PaperExchange extends EventEmitter {
       side: order.side,
       price: fillPrice,
       quantity: remainingQty,
-      fee: remainingQty.times(fillPrice).times(feeRate),
-      feeAsset: this.extractQuoteAsset(order.symbol),
+      fee: order.side === 'BUY' ? fee.div(fillPrice) : fee, // BUY fee denominated in base asset
+      feeAsset,
       timestamp: Date.now(),
       isMaker,
     };
 
     this.fills.push(fill);
 
-    // Update order
     order.executedQty = order.executedQty.plus(remainingQty);
     order.status = order.executedQty.gte(order.quantity) ? 'FILLED' : 'PARTIALLY_FILLED';
     order.updatedAt = Date.now();
 
-    // Update balances
     this.applyFill(fill, order);
 
     this.emit('order.filled', { order, fill });
-    logger.info({ orderId: order.clientOrderId, fillPrice: fillPrice.toString(), quantity: fill.quantity.toString() }, 'Order filled');
+    this.emit('order.update', this.orderToWallexResponse(order));
+    this.emit('trade.detail', {
+      clientOrderId: order.clientOrderId,
+      symbol: order.symbol,
+      side: order.side,
+      price: fill.price.toString(),
+      quantity: fill.quantity.toString(),
+      fee: fill.fee.toString(),
+      feeAsset: fill.feeAsset,
+      timestamp: fill.timestamp,
+    });
+
+    logger.info(
+      {
+        orderId: order.clientOrderId,
+        fillPrice: fillPrice.toString(),
+        quantity: fill.quantity.toString(),
+        fee: fill.fee.toString(),
+      },
+      'Order filled',
+    );
   }
 
   /**
-   * Apply fill to balances
+   * Apply fill to balances.
+   * BUY: locked quote (locked at limit price) reduced by fill notional,
+   *      surplus vs limit price returned to available; fee deducted from received base.
+   * SELL: locked base reduced and burned; proceeds credited minus quote fee.
    */
   private applyFill(fill: PaperFill, order: PaperOrder): void {
-    const fillValue = fill.price.times(fill.quantity);
+    const fillNotional = fill.price.times(fill.quantity);
     const baseAsset = this.extractBaseAsset(order.symbol);
     const quoteAsset = this.extractQuoteAsset(order.symbol);
 
     if (fill.side === 'BUY') {
-      // Buying: spend quote, receive base
       const quoteBalance = this.balances.get(quoteAsset);
       const baseBalance = this.balances.get(baseAsset);
 
       if (quoteBalance) {
-        // Unlock spent quote (minus fees)
-        const spentQuote = fillValue.plus(fill.fee);
-        quoteBalance.locked = quoteBalance.locked.minus(spentQuote);
+        // Quote was locked at order.price * qty; settle at actual fillPrice.
+        const lockedAmount = order.price.times(fill.quantity);
+        quoteBalance.locked = Decimal.max(quoteBalance.locked.minus(lockedAmount), new Decimal(0));
+        const surplus = lockedAmount.minus(fillNotional);
+        if (surplus.gt(0)) {
+          quoteBalance.available = quoteBalance.available.plus(surplus);
+        }
       }
 
       if (baseBalance) {
-        // Receive base (minus fees already calculated)
-        const receivedBase = fill.quantity.minus(fill.fee.div(fill.price));
+        // Receive base minus base-denominated fee
+        const receivedBase = fill.quantity.minus(fill.fee);
         baseBalance.available = baseBalance.available.plus(receivedBase);
         baseBalance.total = baseBalance.total.plus(receivedBase);
       }
     } else {
-      // Selling: spend base, receive quote
       const baseBalance = this.balances.get(baseAsset);
       const quoteBalance = this.balances.get(quoteAsset);
 
       if (baseBalance) {
-        // Unlock spent base
-        baseBalance.locked = baseBalance.locked.minus(fill.quantity);
+        baseBalance.locked = Decimal.max(baseBalance.locked.minus(fill.quantity), new Decimal(0));
         baseBalance.total = baseBalance.total.minus(fill.quantity);
       }
 
       if (quoteBalance) {
-        // Receive quote (minus fees)
-        const receivedQuote = fillValue.minus(fill.fee);
+        const receivedQuote = fillNotional.minus(fill.fee);
         quoteBalance.available = quoteBalance.available.plus(receivedQuote);
         quoteBalance.total = quoteBalance.total.plus(receivedQuote);
       }
@@ -448,17 +557,26 @@ export class PaperExchange extends EventEmitter {
    * Extract base asset from symbol (e.g., BTCUSDT -> BTC)
    */
   private extractBaseAsset(symbol: string): string {
-    // Simple heuristic: first part before USDT or TMN
-    const match = symbol.match(/^([A-Z]+)(USDT|TMN|BTC|ETH)$/i);
-    return match ? match[1] : symbol.substring(0, 3);
+    const upper = symbol.toUpperCase();
+    for (const quote of QUOTE_ASSETS) {
+      if (upper.endsWith(quote) && upper.length > quote.length) {
+        return upper.slice(0, upper.length - quote.length);
+      }
+    }
+    return upper.substring(0, 3);
   }
 
   /**
    * Extract quote asset from symbol (e.g., BTCUSDT -> USDT)
    */
   private extractQuoteAsset(symbol: string): string {
-    const match = symbol.match(/^([A-Z]+)(USDT|TMN|BTC|ETH)$/i);
-    return match ? match[2] : symbol.substring(3);
+    const upper = symbol.toUpperCase();
+    for (const quote of QUOTE_ASSETS) {
+      if (upper.endsWith(quote) && upper.length > quote.length) {
+        return quote;
+      }
+    }
+    return upper.substring(3);
   }
 
   /**
@@ -467,18 +585,9 @@ export class PaperExchange extends EventEmitter {
   reset(): void {
     this.orders.clear();
     this.fills = [];
-    
-    // Reset balances to initial
+
     this.balances.clear();
-    Object.entries(this.config.initialBalances).forEach(([asset, amount]) => {
-      const decAmount = new Decimal(amount);
-      this.balances.set(asset, {
-        asset,
-        available: decAmount,
-        locked: new Decimal(0),
-        total: decAmount,
-      });
-    });
+    this.applyInitialBalances(this.config.initialBalances);
 
     logger.info('Paper exchange reset');
   }

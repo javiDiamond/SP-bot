@@ -2,9 +2,11 @@
  * API Configuration
  */
 
+import path from 'path';
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Load the repo-root .env (no-op when absent, e.g. in docker where env is injected)
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 export const config = {
   // Server

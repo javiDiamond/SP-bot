@@ -1,5 +1,7 @@
 export * from './prisma-client';
 
+export { PrismaClient } from '../generated';
+
 // Re-export Prisma types
 export type {
   Prisma,
@@ -15,20 +17,26 @@ export type {
   PnLSnapshot,
   Backtest,
   BacktestTrade,
+  OptimizationJob,
   SystemSetting,
   EventLog,
   AuditLog,
   RiskSetting,
 } from '../generated';
 
-// Re-export Prisma enums
-export type {
+// Re-export Prisma enums (values, not only types)
+export {
   UserRole,
   StrategyType,
   TradingMode,
   BotStatus,
+  GridLevelStatus,
   OrderSide,
   OrderType,
   OrderStatus,
   BacktestStatus,
+  OptimizationStatus,
+  LogLevel,
 } from '../generated';
+
+export * from './repositories';

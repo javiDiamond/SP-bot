@@ -106,13 +106,17 @@ async function main() {
     });
 
     if (!existingDemoAccount) {
-      // Encrypt a dummy API key for demo purposes
+      // Encrypt a dummy API key for demo purposes (64 hex chars = 32 bytes for AES-256)
       const crypto = require('crypto');
       const dummyKey = 'demo_api_key_12345';
       const iv = crypto.randomBytes(16);
       const cipher = crypto.createCipheriv(
         'aes-256-gcm',
-        Buffer.from(process.env.ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef', 'hex'),
+        Buffer.from(
+          process.env.ENCRYPTION_KEY ||
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+          'hex',
+        ),
         iv
       );
       let encrypted = cipher.update(dummyKey, 'utf8', 'hex');

@@ -113,6 +113,7 @@ export class WallexWebSocketClient extends EventEmitter {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private connectionStartTime: number = 0;
   private pongCount: number = 0;
+  private reconnectAttempts: number = 0;
   private readonly MAX_PONG_COUNT = 100;
   private readonly PING_INTERVAL_MS = 20000; // Server sends PING every 20s
   private readonly RECONNECT_BEFORE_DISCONNECT_MS = 25 * 60 * 1000; // 25 minutes
@@ -120,8 +121,8 @@ export class WallexWebSocketClient extends EventEmitter {
   constructor(config: WallexWsConfig) {
     super();
     this.config = {
-      url: config.url || 'wss://api.wallex.ir/ws',
-      streamKey: config.streamKey || '',
+      url: config.url || process.env.WALLEX_WS_URL || 'wss://api.wallex.ir/ws',
+      streamKey: config.streamKey || process.env.WALLEX_STREAM_KEY || '',
       reconnectInterval: config.reconnectInterval || 5000,
       maxReconnectInterval: config.maxReconnectInterval || 60000,
       pingTimeout: config.pingTimeout || 30000,
@@ -313,6 +314,7 @@ export class WallexWebSocketClient extends EventEmitter {
     logger.info('WebSocket connected');
     this.isConnected = true;
     this.isReconnecting = false;
+    this.reconnectAttempts = 0;
     this.pongCount = 0;
     
     this.emit('ws.connected');
@@ -500,8 +502,8 @@ export class WallexWebSocketClient extends EventEmitter {
    */
   private handlePing(): void {
     if (this.pongCount >= this.MAX_PONG_COUNT) {
-      logger.warn('Max PONG count reached, will reconnect soon');
-      this.scheduleReconnect();
+      logger.warn('Max PONG count reached, reconnecting');
+      this.forceReconnect('pong-cap');
       return;
     }
 
@@ -547,9 +549,22 @@ export class WallexWebSocketClient extends EventEmitter {
     this.reconnectTimer = setTimeout(() => {
       if (this.isConnected) {
         logger.info('Proactive reconnect triggered');
-        this.scheduleReconnect();
+        this.forceReconnect('proactive');
       }
     }, delay);
+  }
+
+  /**
+   * Force a reconnect: close the live socket with a non-1000 code so
+   * handleClose triggers the backoff reconnect, or schedule directly
+   * if already disconnected.
+   */
+  private forceReconnect(reason: string): void {
+    if (this.ws && this.isConnected) {
+      this.ws.close(4000, `forced reconnect: ${reason}`);
+    } else {
+      this.scheduleReconnect();
+    }
   }
 
   /**
@@ -599,13 +614,14 @@ export class WallexWebSocketClient extends EventEmitter {
     const baseDelay = this.config.reconnectInterval;
     const maxDelay = this.config.maxReconnectInterval;
     
-    // Exponential backoff with jitter
-    const attempt = this.listenerCount('ws.reconnecting');
+    // Exponential backoff with jitter based on real attempt counter
+    const attempt = this.reconnectAttempts;
+    this.reconnectAttempts += 1;
     const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 1000, maxDelay);
     
-    logger.info({ delay }, 'Scheduling reconnect');
+    logger.info({ delay, attempt: this.reconnectAttempts }, 'Scheduling reconnect');
     
-    this.emit('ws.reconnecting');
+    this.emit('ws.reconnecting', { attempt: this.reconnectAttempts, delay });
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -613,6 +629,8 @@ export class WallexWebSocketClient extends EventEmitter {
 
     this.reconnectTimer = setTimeout(() => {
       logger.info('Attempting reconnect');
+      // Allow a fresh scheduleReconnect if this attempt fails
+      this.isReconnecting = false;
       this.connect();
     }, delay);
   }

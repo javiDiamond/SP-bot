@@ -2,24 +2,20 @@
  * Backtester Package
  */
 
-export {
-  BacktestEngine,
-} from './backtest-engine';
-
-export {
-  CandleBasedBacktester,
-} from './candle-backtester';
+export { CandleBasedBacktester } from './candle-backtester';
 
 export type {
-  Candle,
-  BacktestConfig as EngineBacktestConfig,
-  BacktestTrade as EngineBacktestTrade,
-  BacktestResult as EngineBacktestResult,
-} from './backtest-engine';
-
-export type {
-  BacktestConfig as CandleBacktestConfig,
-  BacktestTrade as CandleBacktestTrade,
+  BacktestConfig,
+  BacktestTrade,
   BacktestMetrics,
-  BacktestResult as CandleBacktestResult,
+  BacktestResult,
+  SameCandlePolicy,
 } from './candle-backtester';
+
+export { BacktestExchangePort } from './backtest-exchange';
+
+export type {
+  BacktestExchangePortConfig,
+  BacktestFillRecord,
+  BacktestPortfolio,
+} from './backtest-exchange';

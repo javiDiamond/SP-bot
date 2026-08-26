@@ -1,86 +1,57 @@
+/**
+ * Reconciliation Service
+ *
+ * Periodic + on-demand reconciliation of running bots. Delegates to each
+ * BotEngine.reconcile(), which compares exchange open orders vs DB orders
+ * by exact clientOrderId (orphans are never canceled).
+ */
+
 import { prisma } from '@wallex/db';
 import { logger } from '@wallex/shared';
+import type { BotEngine } from '../engines/bot-engine';
+import { workerConfig } from '../config';
 
 export class ReconciliationService {
-  private reconciliationInterval?: NodeJS.Timeout;
+  private timer?: NodeJS.Timeout;
 
-  async start(): Promise<void> {
-    // Run reconciliation every 30 seconds for all active bots
-    const intervalMs = 30000;
-    
-    this.reconciliationInterval = setInterval(async () => {
-      try {
-        await this.reconcileAll();
-      } catch (error) {
-        logger.error('Reconciliation service error', error);
-      }
-    }, intervalMs);
+  constructor(private getEngine: (botId: string) => BotEngine | undefined) {}
 
-    logger.info('Reconciliation service started');
+  start(): void {
+    this.timer = setInterval(() => {
+      this.reconcileAll().catch(err => {
+        logger.warn(`Periodic reconciliation failed: ${String((err as Error)?.message || err)}`);
+      });
+    }, workerConfig.reconcileIntervalMs);
+    logger.info(`Reconciliation service started (every ${workerConfig.reconcileIntervalMs / 60000} min)`);
   }
 
-  async stop(): Promise<void> {
-    if (this.reconciliationInterval) {
-      clearInterval(this.reconciliationInterval);
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = undefined;
     }
-    logger.info('Reconciliation service stopped');
   }
 
   async reconcileBot(botId: string): Promise<void> {
-    logger.info(`Starting reconciliation for bot ${botId}`);
-
-    try {
-      const bot = await prisma.bot.findUnique({
-        where: { id: botId },
-        include: {
-          exchangeAccount: true,
-          gridConfig: true,
-        },
-      });
-
-      if (!bot) {
-        logger.warn(`Bot ${botId} not found`);
-        return;
-      }
-
-      if (bot.status === 'STOPPED' || bot.status === 'ERROR') {
-        logger.debug(`Skipping reconciliation for bot ${botId} (status: ${bot.status})`);
-        return;
-      }
-
-      // Get open orders from exchange
-      // Note: This would use the exchange adapter
-      // For now, we'll just log the action
-      logger.info(`Reconciled bot ${botId}`);
-    } catch (error) {
-      logger.error(`Failed to reconcile bot ${botId}`, error);
-      throw error;
+    const engine = this.getEngine(botId);
+    if (engine && engine.isRunningEngine()) {
+      await engine.reconcile();
+      return;
     }
+    logger.debug(`Skipping reconciliation for bot ${botId} (no running engine)`);
   }
 
   async reconcileAll(): Promise<void> {
-    try {
-      const activeBots = await prisma.bot.findMany({
-        where: {
-          status: {
-            in: ['RUNNING', 'PAUSED'],
-          },
-          enabled: true,
-        },
-      });
-
-      logger.debug(`Reconciling ${activeBots.length} active bots`);
-
-      for (const bot of activeBots) {
-        try {
-          await this.reconcileBot(bot.id);
-        } catch (error) {
-          logger.error(`Failed to reconcile bot ${bot.id}`, error);
-        }
+    const bots = await prisma.bot.findMany({
+      where: { status: { in: ['RUNNING', 'STARTING', 'PAUSED'] } },
+      select: { id: true },
+    });
+    for (const bot of bots) {
+      try {
+        await this.reconcileBot(bot.id);
+      } catch (err) {
+        logger.warn(`Reconciliation failed for bot ${bot.id}: ${String((err as Error)?.message || err)}`);
       }
-    } catch (error) {
-      logger.error('Failed to reconcile all bots', error);
-      throw error;
     }
   }
 }

@@ -2,16 +2,14 @@
  * Grid Strategy Package
  */
 
-export {
-  GridEngine,
-} from './grid-engine';
+export { GridEngine } from './grid-engine';
 
 export type {
-  GridLevel,
-  GridState,
-  GridOrder,
-  GridFill,
+  GridLevelState,
+  GridFillEvent,
   GridMetrics,
-  ExchangeAdapter,
   GridEngineConfig,
+  GridEngineHooks,
+  PreTradeResult,
+  LifecycleAction,
 } from './grid-engine';

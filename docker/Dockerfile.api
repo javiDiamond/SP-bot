@@ -2,11 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install pnpm
-RUN corepack enable pnpm
+# Install pnpm + musl/openssl compat needed by the Prisma engines
+RUN apk add --no-cache libc6-compat openssl wget && corepack enable pnpm
 
 # Copy package files
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* turbo.json ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* turbo.json tsconfig.base.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/exchange/package.json ./packages/exchange/
 COPY packages/grid-strategy/package.json ./packages/grid-strategy/
@@ -35,5 +35,5 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
 
-# Start
-CMD ["sh", "-c", "pnpm db:migrate && pnpm start --filter=@wallex/api"]
+# Start (migrate + seed are idempotent; run node directly — turbo sanitizes env in containers)
+CMD ["sh", "-c", "pnpm db:migrate && pnpm db:seed && node apps/api/dist/index.js"]

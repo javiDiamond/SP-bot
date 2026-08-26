@@ -127,3 +127,81 @@ export interface WallexFee {
   makerFeeRate: string;
   takerFeeRate: string;
 }
+
+// ============================================================================
+// Normalized market info (camelCase, exchange-agnostic)
+// ============================================================================
+
+export interface MarketInfo {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  isSpot: boolean;
+  pricePrecision: number;
+  amountPrecision: number;
+  minNotional?: string;
+  lastPrice?: string;
+  volume24h?: string;
+}
+
+// ============================================================================
+// ExchangePort — the ONLY interface the grid engine talks to
+// ============================================================================
+
+export interface PlaceOrderRequest {
+  clientOrderId: string;
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  price: string;
+  quantity: string;
+  stopPrice?: string;
+}
+
+export interface OrderFillReport {
+  price: string;
+  quantity: string;
+  fee: string;
+  feeAsset?: string;
+}
+
+export interface PlacedOrder {
+  clientOrderId: string;
+  exchangeOrderId?: string;
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  status: OrderStatus;
+  price: string;
+  quantity: string;
+  executedQty: string;
+  executedSum?: string;
+  fee?: string;
+  fills?: OrderFillReport[];
+}
+
+export interface PortDepth {
+  bestBid?: string;
+  bestAsk?: string;
+}
+
+export interface PortFees {
+  makerFeeRate: string;
+  takerFeeRate: string;
+}
+
+export interface ExchangePort {
+  mode: TradingMode;
+  getMarket(symbol: string): Promise<MarketInfo>;
+  getBalances(): Promise<Record<string, Balance>>;
+  getFees(symbol: string): Promise<PortFees>;
+  getDepth(symbol: string): Promise<PortDepth>;
+  placeOrder(req: PlaceOrderRequest): Promise<PlacedOrder>;
+  cancelOrder(
+    clientOrderId: string,
+  ): Promise<{ clientOrderId: string; status: 'CANCELED' | 'NOT_FOUND' }>;
+  getOpenOrders(symbol: string): Promise<PlacedOrder[]>;
+  getFillsSince(symbol: string, sinceTs: number): Promise<PlacedOrder[]>;
+  on(event: 'order.update' | 'trade.detail', cb: (e: unknown) => void): void;
+  off?(event: 'order.update' | 'trade.detail', cb: (e: unknown) => void): void;
+}

@@ -20,12 +20,12 @@ async function main() {
     await worker.start();
     logger.info('Worker started successfully');
   } catch (error) {
-    logger.error('Failed to start worker', error);
+    logger.error(`Failed to start worker: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  logger.error('Fatal error in worker', error);
+  logger.error(`Fatal error in worker: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });

@@ -352,6 +352,9 @@ model Backtest {
   config          Json
   results         Json?
   status          BacktestStatus @default(PENDING)
+  error           String?
+  optimizationId  String?
+  optimization    OptimizationJob? @relation(fields: [optimizationId], references: [id], onDelete: SetNull)
   createdAt       DateTime  @default(now())
   completedAt     DateTime?
   
@@ -382,6 +385,41 @@ model BacktestTrade {
   
   @@index([backtestId])
   @@index([timestamp])
+}
+
+// ============================================================================
+// Parameter Optimization
+// ============================================================================
+
+model OptimizationJob {
+  id            String             @id @default(uuid())
+  userId        String
+  symbol        String
+  dateFrom      DateTime
+  dateTo        DateTime
+  resolution    String
+  // Base grid config + parameter ranges to search:
+  // { base: GridConfig, ranges: { param: { type: 'range'|'list', from?, to?, step?, values? } } }
+  config        Json
+  status        OptimizationStatus @default(PENDING)
+  progress      Float              @default(0)
+  maxCombos     Int                @default(50)
+  bestResult    Json?
+  error         String?
+  createdAt     DateTime           @default(now())
+  completedAt   DateTime?
+
+  backtests     Backtest[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum OptimizationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 // ============================================================================

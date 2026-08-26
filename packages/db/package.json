@@ -2,13 +2,13 @@
   "name": "@wallex/db",
   "version": "1.0.0",
   "private": true,
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate deploy",
-    "db:migrate:dev": "prisma migrate dev",
-    "db:seed": "tsx src/seed.ts",
+    "db:migrate": "sh -c 'if [ -f ../../.env ]; then dotenv -e ../../.env -- prisma migrate deploy; else prisma migrate deploy; fi'",
+    "db:migrate:dev": "sh -c 'if [ -f ../../.env ]; then dotenv -e ../../.env -- prisma migrate dev; else prisma migrate dev; fi'",
+    "db:seed": "sh -c 'if [ -f ../../.env ]; then dotenv -e ../../.env -- tsx src/seed.ts; else tsx src/seed.ts; fi'",
     "db:studio": "prisma studio",
     "lint": "eslint .",
     "build": "tsc"
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "dotenv-cli": "^11.0.0",
     "prisma": "^5.10.0",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0"

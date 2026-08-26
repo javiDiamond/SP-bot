@@ -1,6 +1,19 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getToken } from '../lib/api';
 
 export default function Home() {
-  // Redirect to dashboard
-  redirect('/dashboard');
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace(getToken() ? '/dashboard' : '/login');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+    </div>
+  );
 }

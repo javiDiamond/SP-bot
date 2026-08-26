@@ -17,7 +17,7 @@ describe('DecimalUtils', () => {
   });
 
   it('should divide two numbers', () => {
-    expect(DecimalUtils.div('100', '4', 2)).toBe('25.00');
+    expect(DecimalUtils.div('100', '4', 2)).toBe('25');
   });
 
   it('should round to precision', () => {
@@ -42,8 +42,10 @@ describe('GridMath', () => {
 
     const levels = GridMath.generateGridLevels(config, 2);
     expect(levels).toHaveLength(6); // gridCount + 1
-    expect(levels[0].price).toBe('100.00');
-    expect(levels[5].price).toBe('200.00');
+    expect(levels[0].price).toBe('100');
+    expect(levels[5].price).toBe('200');
+    // Arithmetic spacing: 20 per level
+    expect(levels[1].price).toBe('120');
   });
 
   it('should calculate grid profit', () => {
@@ -55,7 +57,8 @@ describe('GridMath', () => {
     );
 
     expect(parseFloat(result.grossProfitPercent)).toBeCloseTo(1.0, 2);
-    expect(parseFloat(result.netProfitPercent)).toBeCloseTo(0.6, 2);
+    // Fees: (0.001 + 0.001) * 100 = 0.2% → net 0.8%
+    expect(parseFloat(result.netProfitPercent)).toBeCloseTo(0.8, 2);
     expect(result.isProfitable).toBe(true);
   });
 });

@@ -1,124 +1,308 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../../lib/api';
+import { useAuthStore } from '../../../lib/store';
+import { fmtNum } from '../../../lib/format';
+import { Button, Card, CardHeader, ConfirmModal, ErrorBanner, Spinner } from '../../../components/ui';
+import type { SystemStatusData } from '../../../lib/types';
+
 export default function SettingsPage() {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
+
+  const { data: status, isLoading } = useQuery({
+    queryKey: ['system-status'],
+    queryFn: async () => (await api.systemStatus()).data as SystemStatusData,
+    refetchInterval: 15_000,
+  });
+
+  const { data: queueDepths } = useQuery({
+    queryKey: ['queue-depths'],
+    queryFn: async () => (await api.queueDepths()).data,
+    refetchInterval: 15_000,
+  });
+
+  const [form, setForm] = useState({
+    maxBotsGlobal: '10',
+    maxBotsPerSymbol: '3',
+    maxDailyLossPercent: '5',
+    maxQuoteExposureGlobal: '100000',
+  });
+  const [saving, setSaving] = useState(false);
+  const [killBusy, setKillBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [killConfirm, setKillConfirm] = useState<null | boolean>(null);
+
+  useEffect(() => {
+    const rs = status?.riskSettings;
+    if (rs) {
+      setForm({
+        maxBotsGlobal: String(rs.maxBotsGlobal),
+        maxBotsPerSymbol: String(rs.maxBotsPerSymbol),
+        maxDailyLossPercent: String(rs.maxDailyLossPercent),
+        maxQuoteExposureGlobal: String(rs.maxQuoteExposureGlobal),
+      });
+    }
+  }, [status?.riskSettings]);
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['system-status'] });
+  };
+
+  const saveRiskSettings = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      await api.updateRiskSettings({
+        maxBotsGlobal: Number(form.maxBotsGlobal),
+        maxBotsPerSymbol: Number(form.maxBotsPerSymbol),
+        maxDailyLossPercent: Number(form.maxDailyLossPercent),
+        maxQuoteExposureGlobal: form.maxQuoteExposureGlobal,
+      });
+      refresh();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save risk settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleKillSwitch = async (active: boolean) => {
+    setKillBusy(true);
+    setError('');
+    try {
+      await api.killSwitch(active);
+      refresh();
+      queryClient.invalidateQueries({ queryKey: ['bots'] });
+    } catch (err: any) {
+      setError(err?.message || 'Kill switch toggle failed');
+    } finally {
+      setKillBusy(false);
+      setKillConfirm(null);
+    }
+  };
+
+  if (isLoading) return <Spinner />;
+
+  const risk = status?.riskSettings;
+  const killActive = risk?.killSwitchActive ?? false;
+  const liveEnv = status?.liveTradingEnv ?? false;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          System configuration and risk controls
-        </p>
+        <p className="mt-1 text-sm text-gray-500">Global risk controls and emergency switches</p>
       </div>
 
-      {/* Live Trading Warning */}
-      <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <p className="text-sm text-red-700">
-              <strong className="font-medium">Live Trading Disabled: </strong>
-              Live trading is currently disabled by environment configuration. To enable live trading, 
-              set ENABLE_LIVE_TRADING=true in your environment variables and acknowledge the risks.
-            </p>
-          </div>
+      {error && <ErrorBanner message={error} />}
+
+      {!isAdmin && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-md text-sm text-blue-700">
+          Read-only view — risk settings and the kill switch require the ADMIN role.
         </div>
-      </div>
+      )}
 
-      {/* System Status */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">System Status</h3>
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="bg-gray-50 px-4 py-3 rounded-md">
-            <dt className="text-sm font-medium text-gray-500">Trading Mode</dt>
-            <dd className="mt-1 text-sm text-gray-900">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                DRY RUN / PAPER TRADING
-              </span>
-            </dd>
-          </div>
-          <div className="bg-gray-50 px-4 py-3 rounded-md">
-            <dt className="text-sm font-medium text-gray-500">Environment</dt>
-            <dd className="mt-1 text-sm text-gray-900">Development</dd>
-          </div>
-          <div className="bg-gray-50 px-4 py-3 rounded-md">
-            <dt className="text-sm font-medium text-gray-500">Kill Switch</dt>
-            <dd className="mt-1 text-sm text-gray-900">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                Inactive
-              </span>
-            </dd>
-          </div>
-          <div className="bg-gray-50 px-4 py-3 rounded-md">
-            <dt className="text-sm font-medium text-gray-500">WebSocket Status</dt>
-            <dd className="mt-1 text-sm text-gray-900">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                Connected
-              </span>
-            </dd>
-          </div>
-        </dl>
-      </div>
+      {/* System status */}
+      <Card>
+        <CardHeader title="System status" />
+        <div className="p-6">
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="bg-gray-50 px-4 py-3 rounded-md">
+              <dt className="text-sm font-medium text-gray-500">Database</dt>
+              <dd className="mt-1 text-sm">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    status?.services?.database ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {status?.services?.database ? 'Connected' : 'Down'}
+                </span>
+              </dd>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 rounded-md">
+              <dt className="text-sm font-medium text-gray-500">Redis</dt>
+              <dd className="mt-1 text-sm">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    status?.services?.redis ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {status?.services?.redis ? 'Connected' : 'Down'}
+                </span>
+              </dd>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 rounded-md">
+              <dt className="text-sm font-medium text-gray-500">Live trading (environment)</dt>
+              <dd className="mt-1 text-sm">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    liveEnv ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                  }`}
+                >
+                  {liveEnv ? 'ENABLE_LIVE_TRADING=true' : 'ENABLE_LIVE_TRADING=false'}
+                </span>
+              </dd>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 rounded-md">
+              <dt className="text-sm font-medium text-gray-500">Allow live trading (DB)</dt>
+              <dd className="mt-1 text-sm">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    risk?.allowLiveTrading ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                  }`}
+                >
+                  {risk?.allowLiveTrading ? 'Allowed' : 'Blocked'}
+                </span>
+              </dd>
+            </div>
+            {queueDepths && (
+              <div className="bg-gray-50 px-4 py-3 rounded-md sm:col-span-2">
+                <dt className="text-sm font-medium text-gray-500">Queue depths</dt>
+                <dd className="mt-1 text-sm text-gray-700">
+                  {Object.entries(queueDepths)
+                    .map(([q, d]) => `${q}: ${d}`)
+                    .join(' · ')}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      </Card>
 
-      {/* Risk Limits */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Global Risk Limits</h3>
-        <div className="space-y-4">
+      {/* Risk limits */}
+      <Card>
+        <CardHeader
+          title="Global risk limits"
+          actions={
+            isAdmin && (
+              <Button size="sm" onClick={saveRiskSettings} disabled={saving}>
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            )
+          }
+        />
+        <div className="p-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Max Bots (Global)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max bots (global)</label>
             <input
               type="number"
-              defaultValue={10}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              disabled
+              value={form.maxBotsGlobal}
+              disabled={!isAdmin}
+              onChange={(e) => setForm((f) => ({ ...f, maxBotsGlobal: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Max Daily Loss (%)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max bots per symbol</label>
+            <input
+              type="number"
+              value={form.maxBotsPerSymbol}
+              disabled={!isAdmin}
+              onChange={(e) => setForm((f) => ({ ...f, maxBotsPerSymbol: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max daily loss (%)</label>
             <input
               type="number"
               step="0.01"
-              defaultValue={5}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              disabled
+              value={form.maxDailyLossPercent}
+              disabled={!isAdmin}
+              onChange={(e) => setForm((f) => ({ ...f, maxDailyLossPercent: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Max Quote Exposure (Global)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Max quote exposure (global)
+            </label>
             <input
-              type="number"
-              defaultValue={100000}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              disabled
+              value={form.maxQuoteExposureGlobal}
+              disabled={!isAdmin}
+              onChange={(e) => setForm((f) => ({ ...f, maxQuoteExposureGlobal: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
             />
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Emergency Controls */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Emergency Controls</h3>
-        <div className="space-y-4">
-          <button
-            type="button"
-            className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            Activate Kill Switch (Stop All Bots)
-          </button>
-          <button
-            type="button"
-            className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Cancel All Open Orders
-          </button>
+      {/* Live trading flag */}
+      <Card>
+        <CardHeader title="Live trading gate" />
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Allow live trading (global flag)</p>
+              <p className="text-sm text-gray-500">
+                Even when allowed here, live bots additionally require ENABLE_LIVE_TRADING=true in
+                the API/worker environment and a live-enabled exchange account.
+              </p>
+            </div>
+            <Button
+              variant={risk?.allowLiveTrading ? 'danger' : 'primary'}
+              disabled={!isAdmin || !liveEnv}
+              title={!liveEnv ? 'ENABLE_LIVE_TRADING is false in the environment' : undefined}
+              onClick={() => {
+                api
+                  .updateRiskSettings({ allowLiveTrading: !(risk?.allowLiveTrading ?? false) })
+                  .then(refresh)
+                  .catch((err) => setError(err?.message || 'Failed'));
+              }}
+            >
+              {risk?.allowLiveTrading ? 'Disable live trading' : 'Allow live trading'}
+            </Button>
+          </div>
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
+            <p className="text-sm text-red-700">
+              <strong className="font-medium">Risk warning: </strong>
+              live trading places real orders with real funds. Grid bots can lose money in trending
+              markets. Test thoroughly in dry-run mode first.
+            </p>
+          </div>
         </div>
-      </div>
+      </Card>
+
+      {/* Kill switch */}
+      <Card className={killActive ? 'ring-2 ring-red-500' : ''}>
+        <CardHeader title="Emergency kill switch" />
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-600">
+            Activating the kill switch blocks new orders on every bot, commands all running bots to
+            stop, and marks them KILLED. It persists until deactivated.
+          </p>
+          <Button
+            variant={killActive ? 'success' : 'danger'}
+            disabled={!isAdmin || killBusy}
+            onClick={() => setKillConfirm(!killActive)}
+          >
+            {killBusy
+              ? 'Working…'
+              : killActive
+                ? 'Deactivate kill switch'
+                : 'Activate kill switch (stop all bots)'}
+          </Button>
+        </div>
+      </Card>
+
+      <ConfirmModal
+        open={killConfirm !== null}
+        title={killConfirm ? 'Activate kill switch' : 'Deactivate kill switch'}
+        message={
+          killConfirm
+            ? 'This will cancel open orders and stop ALL running bots immediately. Continue?'
+            : 'Deactivate the kill switch? Bots will NOT restart automatically — start them again from the Bots page.'
+        }
+        danger={Boolean(killConfirm)}
+        confirmLabel={killConfirm ? 'Activate' : 'Deactivate'}
+        busy={killBusy}
+        onCancel={() => setKillConfirm(null)}
+        onConfirm={() => void toggleKillSwitch(Boolean(killConfirm))}
+      />
     </div>
   );
 }

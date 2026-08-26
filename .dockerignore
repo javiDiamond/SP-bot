@@ -1,0 +1,21 @@
+# Dependencies / build artifacts
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.turbo
+packages/db/generated
+
+# VCS / CI / tooling
+.git
+.github
+.kilo
+*.log
+logs/
+
+# Environment (secrets are injected via compose)
+.env
+
+# OS / editor
+.DS_Store
+*.swp

@@ -1,39 +1,34 @@
 /**
- * Auth route - User authentication
+ * Auth routes — login / register / me (bcryptjs, schema field passwordHash)
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
-import argon2 from 'argon2';
+import bcrypt from 'bcryptjs';
+import { LoginSchema, RegisterSchema } from '@wallex/shared';
 import getPrismaClient from '../lib/database.js';
+import { authenticate, getAuthUserId } from '../middleware/auth.js';
+import { writeAuditLog } from '../lib/audit.js';
 
-const authRoutes: FastifyPluginAsync = async (fastify) => {
+const authRoutes: FastifyPluginAsync = async fastify => {
   const prisma = getPrismaClient();
 
-  const loginSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
-  });
-
-  const registerSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
-    name: z.string().optional(),
+  const publicUser = (user: { id: string; email: string; role: string }) => ({
+    id: user.id,
+    email: user.email,
+    role: user.role,
   });
 
   /**
    * POST /api/auth/register
-   * Register a new user (only if no users exist or in dev mode)
+   * First user ever (or dev mode) may register; first user becomes ADMIN.
    */
   fastify.post('/register', async (request, reply) => {
     try {
-      const body = request.body as any;
-      const validated = registerSchema.parse(body);
+      const validated = RegisterSchema.parse(request.body);
 
-      // Check if this is the first user or if registration is allowed
       const userCount = await prisma.user.count();
       const isDev = process.env.NODE_ENV === 'development';
-      
+
       if (userCount > 0 && !isDev) {
         return reply.code(403).send({
           success: false,
@@ -41,7 +36,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Check if user exists
       const existingUser = await prisma.user.findUnique({
         where: { email: validated.email },
       });
@@ -53,168 +47,112 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Hash password
-      const hashedPassword = await argon2.hash(validated.password);
+      const passwordHash = await bcrypt.hash(validated.password, 10);
 
-      // Create user
       const user = await prisma.user.create({
         data: {
           email: validated.email,
-          password: hashedPassword,
-          name: validated.name || 'Admin',
+          passwordHash,
           role: userCount === 0 ? 'ADMIN' : 'TRADER',
         },
       });
 
-      // Generate token
-      const token = fastify.jwt.sign({ 
-        userId: user.id, 
+      const token = fastify.jwt.sign({
+        userId: user.id,
         email: user.email,
-        role: user.role 
+        role: user.role,
       });
 
       return {
         success: true,
-        data: {
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-          },
-          token,
-        },
+        data: { user: publicUser(user), token },
       };
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
+      if (error?.name === 'ZodError') {
         return reply.code(400).send({
           success: false,
           error: 'Validation error',
           details: error.errors,
         });
       }
-
       fastify.log.error(error, 'Failed to register user');
       return reply.code(500).send({
         success: false,
-        error: error.message || 'Failed to register user',
+        error: 'Failed to register user',
       });
     }
   });
 
   /**
    * POST /api/auth/login
-   * Login user
    */
   fastify.post('/login', async (request, reply) => {
     try {
-      const body = request.body as any;
-      const validated = loginSchema.parse(body);
+      const validated = LoginSchema.parse(request.body);
 
-      // Find user
       const user = await prisma.user.findUnique({
         where: { email: validated.email },
       });
 
       if (!user) {
-        return reply.code(401).send({
-          success: false,
-          error: 'Invalid credentials',
-        });
+        return reply.code(401).send({ success: false, error: 'Invalid credentials' });
       }
 
-      // Verify password
-      const validPassword = await argon2.verify(user.password, validated.password);
-
+      const validPassword = await bcrypt.compare(validated.password, user.passwordHash);
       if (!validPassword) {
-        return reply.code(401).send({
-          success: false,
-          error: 'Invalid credentials',
-        });
+        return reply.code(401).send({ success: false, error: 'Invalid credentials' });
       }
 
-      // Generate token
-      const token = fastify.jwt.sign({ 
-        userId: user.id, 
+      const token = fastify.jwt.sign({
+        userId: user.id,
         email: user.email,
-        role: user.role 
+        role: user.role,
+      });
+
+      await writeAuditLog({
+        userId: user.id,
+        action: 'auth.login',
+        resource: 'user',
+        resourceId: user.id,
+        request,
       });
 
       return {
         success: true,
-        data: {
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-          },
-          token,
-        },
+        data: { user: publicUser(user), token },
       };
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
+      if (error?.name === 'ZodError') {
         return reply.code(400).send({
           success: false,
           error: 'Validation error',
           details: error.errors,
         });
       }
-
-      fastify.log.error(error, 'Failed to login user');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to login',
-      });
+      fastify.log.error(error, 'Failed to login');
+      return reply.code(500).send({ success: false, error: 'Failed to login' });
     }
   });
 
   /**
    * GET /api/auth/me
-   * Get current user info
    */
-  fastify.get('/me', async (request, reply) => {
+  fastify.get('/me', { preHandler: [authenticate] }, async (request, reply) => {
     try {
-      // Extract token from header
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return reply.code(401).send({
-          success: false,
-          error: 'No token provided',
-        });
-      }
-
-      const token = authHeader.substring(7);
-      const decoded = await request.jwtVerify() as any;
-
+      const userId = getAuthUserId(request);
       const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          createdAt: true,
-        },
+        where: { id: userId },
+        select: { id: true, email: true, role: true, createdAt: true },
       });
 
       if (!user) {
-        return reply.code(404).send({
-          success: false,
-          error: 'User not found',
-        });
+        return reply.code(404).send({ success: false, error: 'User not found' });
       }
 
-      return {
-        success: true,
-        data: user,
-      };
+      return { success: true, data: user };
     } catch (error: any) {
       fastify.log.error(error, 'Failed to get current user');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to get user info',
-      });
+      return reply.code(500).send({ success: false, error: 'Failed to get user info' });
     }
   });
 };

@@ -1,30 +1,24 @@
 /**
  * Database connection module
+ * Reuses the shared Prisma singleton from @wallex/db.
  */
 
-import { PrismaClient } from '@wallex/db';
-
-let prisma: PrismaClient | null = null;
+import { prisma, checkDatabaseHealth, disconnectPrisma } from '@wallex/db';
+import type { PrismaClient } from '@wallex/db';
 
 export function getPrismaClient(): PrismaClient {
-  if (!prisma) {
-    prisma = new PrismaClient({
-      log: ['query', 'info', 'warn', 'error'],
-    });
-  }
   return prisma;
 }
 
 export async function connectDatabase(): Promise<void> {
-  const client = getPrismaClient();
-  await client.$connect();
+  const healthy = await checkDatabaseHealth();
+  if (!healthy) {
+    throw new Error('Database health check failed at startup');
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {
-  if (prisma) {
-    await prisma.$disconnect();
-    prisma = null;
-  }
+  await disconnectPrisma();
 }
 
 export default getPrismaClient;

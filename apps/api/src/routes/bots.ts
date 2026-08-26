@@ -1,308 +1,345 @@
 /**
- * Bots route - Grid bot CRUD and management
+ * Bots routes — grid bot CRUD + lifecycle control via worker queue
  */
 
 import { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
+import { CreateBotSchema, UpdateBotSchema } from '@wallex/shared';
+import { BotStatus } from '@wallex/db';
 import getPrismaClient from '../lib/database.js';
 import { config } from '../config.js';
+import { authenticate, getAuthUserId } from '../middleware/auth.js';
+import { enqueueBotCommand } from '../lib/queue.js';
+import { writeAuditLog } from '../lib/audit.js';
 
-const botsRoutes: FastifyPluginAsync = async (fastify) => {
+const botsRoutes: FastifyPluginAsync = async fastify => {
   const prisma = getPrismaClient();
 
-  const createBotSchema = z.object({
-    name: z.string().min(1).max(50),
-    symbol: z.string(),
-    gridType: z.enum(['ARITHMETIC', 'GEOMETRIC']),
-    lowerPrice: z.string(),
-    upperPrice: z.string(),
-    gridCount: z.number().int().min(2),
-    totalInvestmentQuote: z.string().optional(),
-    mode: z.enum(['DRY_RUN', 'LIVE']).default('DRY_RUN'),
-    inventoryMode: z.enum(['EXISTING_ONLY', 'AUTO_REBALANCE', 'MANUAL']).default('EXISTING_ONLY'),
-    makerOnly: z.boolean().default(true),
-    minProfitAfterFeesBps: z.number().int().min(0).default(10),
-    onRangeExit: z.enum(['PAUSE_KEEP_ORDERS', 'PAUSE_CANCEL_ALL', 'STOP_CANCEL_ALL', 'RECENTER', 'TRAILING']).default('PAUSE_KEEP_ORDERS'),
-  });
+  fastify.addHook('preHandler', authenticate);
+
+  const loadOwnedBot = async (id: string, userId: string, isAdmin: boolean) => {
+    const bot = await prisma.bot.findUnique({ where: { id } });
+    if (!bot) return null;
+    if (!isAdmin && bot.userId !== userId) return null;
+    return bot;
+  };
 
   /**
    * GET /api/v1/bots
-   * Get all bots for current user
    */
   fastify.get('/', async (request, reply) => {
     try {
-      // For now, return all bots (auth will be added later)
+      const userId = getAuthUserId(request);
       const bots = await prisma.bot.findMany({
+        where: { userId },
         include: {
-          gridLevels: {
-            orderBy: { levelIndex: 'asc' },
-          },
-          orders: {
-            take: 10,
-            orderBy: { createdAt: 'desc' },
-          },
+          gridLevels: { orderBy: { levelIndex: 'asc' } },
+          orders: { take: 10, orderBy: { createdAt: 'desc' } },
         },
         orderBy: { createdAt: 'desc' },
       });
 
-      return {
-        success: true,
-        data: bots,
-      };
+      return { success: true, data: bots };
     } catch (error: any) {
       fastify.log.error(error, 'Failed to fetch bots');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to fetch bots',
-      });
+      return reply.code(500).send({ success: false, error: error.message || 'Failed to fetch bots' });
     }
   });
 
   /**
    * GET /api/v1/bots/:id
-   * Get specific bot details
    */
   fastify.get('/:id', async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
-      
       const bot = await prisma.bot.findUnique({
         where: { id },
         include: {
-          gridLevels: {
-            orderBy: { levelIndex: 'asc' },
-          },
-          orders: {
-            orderBy: { createdAt: 'desc' },
-          },
-          fills: {
-            orderBy: { timestamp: 'desc' },
-            take: 50,
-          },
-          pnlSnapshots: {
-            orderBy: { timestamp: 'desc' },
-            take: 100,
-          },
+          gridLevels: { orderBy: { levelIndex: 'asc' } },
+          orders: { orderBy: { createdAt: 'desc' }, take: 200 },
+          fills: { orderBy: { timestamp: 'desc' }, take: 200 },
+          pnlSnapshots: { orderBy: { timestamp: 'desc' }, take: 500 },
         },
       });
 
       if (!bot) {
-        return reply.code(404).send({
-          success: false,
-          error: 'Bot not found',
-        });
+        return reply.code(404).send({ success: false, error: 'Bot not found' });
       }
 
-      return {
-        success: true,
-        data: bot,
-      };
+      return { success: true, data: bot };
     } catch (error: any) {
       fastify.log.error(error, 'Failed to fetch bot');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to fetch bot',
-      });
+      return reply.code(500).send({ success: false, error: error.message || 'Failed to fetch bot' });
     }
   });
 
   /**
    * POST /api/v1/bots
-   * Create a new bot
    */
   fastify.post('/', async (request, reply) => {
     try {
-      const body = request.body as any;
-      const validated = createBotSchema.parse(body);
+      const userId = getAuthUserId(request);
+      const validated = CreateBotSchema.parse(request.body);
 
-      // Check if live trading is allowed
-      if (validated.mode === 'LIVE' && !config.enableLiveTrading) {
+      // Live gate: env + DB risk settings + account flag
+      if (validated.mode === 'LIVE') {
+        if (!config.enableLiveTrading) {
+          return reply.code(400).send({
+            success: false,
+            error: 'Live trading disabled: ENABLE_LIVE_TRADING=false',
+          });
+        }
+        const risk = await prisma.riskSetting.findFirst({ where: { key: 'global' } });
+        if (!risk?.allowLiveTrading) {
+          return reply.code(400).send({
+            success: false,
+            error: 'Live trading disabled in risk settings',
+          });
+        }
+        if (!validated.exchangeAccountId) {
+          return reply.code(400).send({
+            success: false,
+            error: 'Live bots require an exchange account',
+          });
+        }
+        const account = await prisma.exchangeAccount.findUnique({
+          where: { id: validated.exchangeAccountId },
+        });
+        if (!account?.isLiveEnabled) {
+          return reply.code(400).send({
+            success: false,
+            error: 'Exchange account is not live-enabled',
+          });
+        }
+      }
+
+      // Price range sanity
+      const lower = parseFloat(validated.gridConfig.lowerPrice);
+      const upper = parseFloat(validated.gridConfig.upperPrice);
+      if (!(lower > 0) || !(upper > 0) || lower >= upper) {
         return reply.code(400).send({
           success: false,
-          error: 'Live trading is disabled. Set ENABLE_LIVE_TRADING=true to enable.',
+          error: 'lowerPrice must be positive and less than upperPrice',
         });
       }
 
-      // Validate price range
-      const lower = parseFloat(validated.lowerPrice);
-      const upper = parseFloat(validated.upperPrice);
-      
-      if (lower >= upper) {
-        return reply.code(400).send({
-          success: false,
-          error: 'Lower price must be less than upper price',
-        });
-      }
-
-      // Create bot
       const bot = await prisma.bot.create({
         data: {
-          userId: 'system', // Will be replaced with auth user
+          userId,
+          exchangeAccountId: validated.exchangeAccountId,
           name: validated.name,
-          symbol: validated.symbol,
+          symbol: validated.symbol.toUpperCase(),
           strategyType: 'GRID',
           mode: validated.mode,
-          status: 'DRAFT',
-          gridConfig: validated,
+          status: BotStatus.DRAFT,
+          gridConfig: validated.gridConfig as object,
+          maxQuoteExposure: validated.maxQuoteExposure,
+          maxBaseExposure: validated.maxBaseExposure,
+          dailyLossLimitPercent:
+            validated.dailyLossLimitPercent !== undefined
+              ? validated.dailyLossLimitPercent / 100
+              : validated.gridConfig.dailyLossLimitPercent !== undefined
+                ? validated.gridConfig.dailyLossLimitPercent / 100
+                : undefined,
         },
       });
 
-      return {
-        success: true,
-        data: bot,
-      };
+      await writeAuditLog({
+        userId,
+        action: 'bot.create',
+        resource: 'bot',
+        resourceId: bot.id,
+        data: { name: bot.name, symbol: bot.symbol, mode: bot.mode },
+        request,
+      });
+
+      return { success: true, data: bot };
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        return reply.code(400).send({
-          success: false,
-          error: 'Validation error',
-          details: error.errors,
-        });
+      if (error?.name === 'ZodError') {
+        return reply.code(400).send({ success: false, error: 'Validation error', details: error.errors });
+      }
+      fastify.log.error(error, 'Failed to create bot');
+      return reply.code(500).send({ success: false, error: error.message || 'Failed to create bot' });
+    }
+  });
+
+  /**
+   * PATCH /api/v1/bots/:id
+   */
+  fastify.patch('/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const userId = getAuthUserId(request);
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const bot = await loadOwnedBot(id, userId, user?.role === 'ADMIN');
+      if (!bot) return reply.code(404).send({ success: false, error: 'Bot not found' });
+      if (bot.status !== BotStatus.DRAFT && bot.status !== BotStatus.STOPPED && bot.status !== BotStatus.ERROR) {
+        return reply.code(409).send({ success: false, error: 'Stop the bot before editing' });
       }
 
-      fastify.log.error(error, 'Failed to create bot');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to create bot',
-      });
-    }
-  });
-
-  /**
-   * POST /api/v1/bots/:id/start
-   * Start a bot
-   */
-  fastify.post('/:id/start', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      
-      const bot = await prisma.bot.update({
+      const validated = UpdateBotSchema.parse(request.body);
+      const updated = await prisma.bot.update({
         where: { id },
         data: {
-          status: 'STARTING',
-          startedAt: new Date(),
+          name: validated.name,
+          gridConfig: validated.gridConfig ? (validated.gridConfig as object) : undefined,
+          maxQuoteExposure: validated.maxQuoteExposure,
+          maxBaseExposure: validated.maxBaseExposure,
+          dailyLossLimitPercent:
+            validated.dailyLossLimitPercent !== undefined
+              ? validated.dailyLossLimitPercent / 100
+              : undefined,
         },
       });
 
-      // In production, this would send a command to the worker via Redis queue
-      fastify.log.info({ botId: id }, 'Bot start requested');
-
-      return {
-        success: true,
-        data: bot,
-      };
+      return { success: true, data: updated };
     } catch (error: any) {
-      fastify.log.error(error, 'Failed to start bot');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to start bot',
-      });
+      if (error?.name === 'ZodError') {
+        return reply.code(400).send({ success: false, error: 'Validation error', details: error.errors });
+      }
+      return reply.code(500).send({ success: false, error: error.message || 'Failed to update bot' });
     }
   });
 
-  /**
-   * POST /api/v1/bots/:id/pause
-   * Pause a running bot
-   */
-  fastify.post('/:id/pause', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      
-      const bot = await prisma.bot.update({
-        where: { id },
-        data: { status: 'PAUSED' },
-      });
+  // ==========================================================================
+  // Lifecycle control — sets transitional DB status and enqueues worker command
+  // ==========================================================================
 
-      return {
-        success: true,
-        data: bot,
-      };
-    } catch (error: any) {
-      fastify.log.error(error, 'Failed to pause bot');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to pause bot',
-      });
-    }
-  });
+  type CommandRoute = {
+    path: string;
+    command: 'START' | 'PAUSE' | 'RESUME' | 'STOP' | 'CANCEL_ALL';
+    transitional?: BotStatus;
+    allowedFrom: BotStatus[];
+    audit: string;
+  };
 
-  /**
-   * POST /api/v1/bots/:id/resume
-   * Resume a paused bot
-   */
-  fastify.post('/:id/resume', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      
-      const bot = await prisma.bot.update({
-        where: { id },
-        data: { status: 'RUNNING' },
-      });
+  const commandRoutes: CommandRoute[] = [
+    {
+      path: '/:id/start',
+      command: 'START',
+      transitional: BotStatus.STARTING,
+      allowedFrom: [BotStatus.DRAFT, BotStatus.STOPPED, BotStatus.ERROR, BotStatus.RANGE_EXITED],
+      audit: 'bot.start',
+    },
+    {
+      path: '/:id/pause',
+      command: 'PAUSE',
+      transitional: BotStatus.PAUSING,
+      allowedFrom: [BotStatus.RUNNING, BotStatus.STARTING],
+      audit: 'bot.pause',
+    },
+    {
+      path: '/:id/resume',
+      command: 'RESUME',
+      transitional: BotStatus.STARTING,
+      allowedFrom: [BotStatus.PAUSED, BotStatus.PAUSING],
+      audit: 'bot.resume',
+    },
+    {
+      path: '/:id/stop',
+      command: 'STOP',
+      transitional: BotStatus.STOPPING,
+      allowedFrom: [
+        BotStatus.RUNNING,
+        BotStatus.STARTING,
+        BotStatus.PAUSED,
+        BotStatus.PAUSING,
+        BotStatus.ERROR,
+        BotStatus.RANGE_EXITED,
+      ],
+      audit: 'bot.stop',
+    },
+    {
+      path: '/:id/cancel-all',
+      command: 'CANCEL_ALL',
+      allowedFrom: [BotStatus.RUNNING, BotStatus.PAUSED, BotStatus.STARTING, BotStatus.PAUSING, BotStatus.ERROR],
+      audit: 'bot.cancel_all',
+    },
+  ];
 
-      return {
-        success: true,
-        data: bot,
-      };
-    } catch (error: any) {
-      fastify.log.error(error, 'Failed to resume bot');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to resume bot',
-      });
-    }
-  });
+  for (const route of commandRoutes) {
+    fastify.post(route.path, async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const userId = getAuthUserId(request);
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        const bot = await loadOwnedBot(id, userId, user?.role === 'ADMIN');
+        if (!bot) return reply.code(404).send({ success: false, error: 'Bot not found' });
 
-  /**
-   * POST /api/v1/bots/:id/stop
-   * Stop a bot
-   */
-  fastify.post('/:id/stop', async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      
-      const bot = await prisma.bot.update({
-        where: { id },
-        data: {
-          status: 'STOPPED',
-          stoppedAt: new Date(),
-        },
-      });
+        if (!route.allowedFrom.includes(bot.status)) {
+          return reply.code(409).send({
+            success: false,
+            error: `Cannot ${route.command.toLowerCase()} bot in status ${bot.status}`,
+          });
+        }
 
-      return {
-        success: true,
-        data: bot,
-      };
-    } catch (error: any) {
-      fastify.log.error(error, 'Failed to stop bot');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to stop bot',
-      });
-    }
-  });
+        await enqueueBotCommand({
+          type: route.command,
+          botId: id,
+          actorUserId: userId,
+          ts: Date.now(),
+        });
+
+        const updated = await prisma.bot.update({
+          where: { id },
+          data: {
+            ...(route.transitional ? { status: route.transitional } : {}),
+            ...(route.command === 'START' ? { startedAt: new Date() } : {}),
+            ...(route.command === 'STOP' ? { stoppedAt: new Date() } : {}),
+          },
+        });
+
+        await writeAuditLog({
+          userId,
+          action: route.audit,
+          resource: 'bot',
+          resourceId: id,
+          request,
+        });
+
+        return { success: true, data: updated };
+      } catch (error: any) {
+        fastify.log.error(error, `Failed bot command ${route.command}`);
+        return reply.code(500).send({ success: false, error: error.message || 'Command failed' });
+      }
+    });
+  }
 
   /**
    * DELETE /api/v1/bots/:id
-   * Delete a bot
    */
   fastify.delete('/:id', async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
-      
-      await prisma.bot.delete({
-        where: { id },
+      const userId = getAuthUserId(request);
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const bot = await loadOwnedBot(id, userId, user?.role === 'ADMIN');
+      if (!bot) return reply.code(404).send({ success: false, error: 'Bot not found' });
+
+      const deletableStatuses: BotStatus[] = [
+        BotStatus.DRAFT,
+        BotStatus.STOPPED,
+        BotStatus.ERROR,
+        BotStatus.RANGE_EXITED,
+      ];
+      if (!deletableStatuses.includes(bot.status)) {
+        return reply.code(409).send({ success: false, error: 'Stop the bot before deleting' });
+      }
+
+      await prisma.bot.delete({ where: { id } });
+
+      await writeAuditLog({
+        userId,
+        action: 'bot.delete',
+        resource: 'bot',
+        resourceId: id,
+        data: { name: bot.name },
+        request,
       });
 
-      return {
-        success: true,
-        message: 'Bot deleted',
-      };
+      return { success: true, message: 'Bot deleted' };
     } catch (error: any) {
       fastify.log.error(error, 'Failed to delete bot');
-      return reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to delete bot',
-      });
+      return reply.code(500).send({ success: false, error: error.message || 'Failed to delete bot' });
     }
   });
 };

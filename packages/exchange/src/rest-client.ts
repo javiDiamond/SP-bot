@@ -557,6 +557,46 @@ export class WallexRestClient extends EventEmitter {
     const result = await this.getOpenOrders({ symbol });
     return result[symbol] || [];
   }
+
+  /**
+   * Get a single market by symbol (derived from getMarkets, no native endpoint)
+   */
+  async getMarket(symbol: string): Promise<WallexMarket | undefined> {
+    const markets = await this.getMarkets();
+    const normalized = symbol.toUpperCase();
+    return markets.find(m => m.symbol.toUpperCase() === normalized);
+  }
+
+  /**
+   * Cancel all open orders for a symbol.
+   * Wallex has no native cancel-all endpoint, so this loops over open orders
+   * and cancels each by client_id (honoring the order rate limiter).
+   * Unknown/foreign orders are never canceled by this helper unless includeUnknown=true.
+   */
+  async cancelAllOrders(
+    symbol: string,
+    options?: { clientOrderIdFilter?: (clientOrderId: string) => boolean },
+  ): Promise<{ canceled: string[]; failed: string[] }> {
+    const open = await this.getOpenOrdersForSymbol(symbol);
+    const canceled: string[] = [];
+    const failed: string[] = [];
+
+    for (const order of open) {
+      if (!order.clientOrderId) continue;
+      if (options?.clientOrderIdFilter && !options.clientOrderIdFilter(order.clientOrderId)) {
+        continue;
+      }
+      try {
+        await this.cancelOrder(order.clientOrderId);
+        canceled.push(order.clientOrderId);
+      } catch (err) {
+        logger.warn({ clientOrderId: order.clientOrderId, err }, 'cancel failed in cancelAllOrders');
+        failed.push(order.clientOrderId);
+      }
+    }
+
+    return { canceled, failed };
+  }
 }
 
 // ============================================================================

@@ -1,44 +1,60 @@
+/**
+ * Redis distributed lock with value-checked release (Lua compare-and-delete)
+ * and TTL renewal for lock holders.
+ */
+
 import Redis from 'ioredis';
+import { workerConfig } from '../config';
+
+const RELEASE_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+else
+  return 0
+end
+`;
+
+const EXTEND_SCRIPT = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("PEXPIRE", KEYS[1], ARGV[2])
+else
+  return 0
+end
+`;
 
 export class RedisLock {
   private connection: Redis;
 
-  constructor() {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    this.connection = new Redis(redisUrl);
+  constructor(redisUrl?: string) {
+    this.connection = new Redis(redisUrl || workerConfig.redisUrl, {
+      maxRetriesPerRequest: 2,
+    });
   }
 
+  /** Try to acquire `key`. Returns the lock value (ownership token) or null. */
   async acquire(key: string, ttlMs: number): Promise<string | null> {
     const value = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-    
-    // Try to set key with NX (only if not exists)
     const result = await this.connection.set(key, value, 'PX', ttlMs, 'NX');
-    
-    if (result === 'OK') {
-      return value;
-    }
-    
-    return null;
+    return result === 'OK' ? value : null;
   }
 
-  async release(lockKey: string): Promise<void> {
-    // In production, you'd verify the lock value matches before deleting
-    // This is a simplified version
-    await this.connection.del(lockKey);
+  /** Release only if we still own the lock (Lua compare-and-delete). */
+  async release(key: string, value: string): Promise<boolean> {
+    const result = await this.connection.eval(RELEASE_SCRIPT, 1, key, value);
+    return result === 1;
   }
 
+  /** Renew the TTL only if we still own the lock. */
   async extend(key: string, value: string, ttlMs: number): Promise<boolean> {
-    // Verify we still own the lock
-    const currentValue = await this.connection.get(key);
-    if (currentValue !== value) {
-      return false;
-    }
-
-    const result = await this.connection.set(key, value, 'PX', ttlMs, 'XX');
-    return result === 'OK';
+    const result = await this.connection.eval(EXTEND_SCRIPT, 1, key, value, String(ttlMs));
+    return result === 1;
   }
 
   async close(): Promise<void> {
-    await this.connection.quit();
+    try {
+      await this.connection.quit();
+    } catch {
+      this.connection.disconnect();
+    }
   }
 }

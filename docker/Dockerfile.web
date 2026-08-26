@@ -8,20 +8,28 @@ RUN corepack enable pnpm
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* turbo.json ./
+# Copy workspace manifests (all of them so pnpm can resolve the workspace graph)
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* turbo.json tsconfig.base.json ./
+COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
+COPY apps/worker/package.json ./apps/worker/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/exchange/package.json ./packages/exchange/
+COPY packages/grid-strategy/package.json ./packages/grid-strategy/
+COPY packages/backtester/package.json ./packages/backtester/
+COPY packages/db/package.json ./packages/db/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile || pnpm install
 
-# Copy source code
+# Copy the source needed to build the web app (and its workspace deps)
 COPY apps/web ./apps/web
 COPY packages/shared ./packages/shared
+# Prisma schema is required by the workspace build's db:generate step
+COPY packages/db/prisma ./packages/db/prisma
 
-# Build
-RUN pnpm build --filter=@wallex/web
+# Build the dashboard and its workspace dependencies
+RUN pnpm build --filter=@wallex-grid/web...
 
 # Production image
 FROM node:20-alpine AS runner
