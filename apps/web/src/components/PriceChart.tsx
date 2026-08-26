@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { createChart, ColorType, LineStyle, type IChartApi } from 'lightweight-charts';
 import { themeColor, useTheme } from '../lib/theme';
 
@@ -12,6 +13,15 @@ export interface ChartCandle {
   close: string;
 }
 
+/**
+ * Candlestick chart with grid-level price lines.
+ *
+ * RTL note: the chart canvas is deliberately kept LTR (`dir="ltr"`). Charting
+ * libraries (lightweight-charts) do not natively support mirrored rendering;
+ * time-series charts conventionally read left-to-right even in RTL UIs. All
+ * surrounding titles/labels outside the canvas are RTL-aware. See
+ * docs/ASSUMPTIONS.md.
+ */
 export function PriceChart({
   candles,
   gridLevels = [],
@@ -21,6 +31,7 @@ export function PriceChart({
   gridLevels?: Array<{ price: string; active?: boolean }>;
   height?: number;
 }) {
+  const t = useTranslations('bots.detail');
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const { theme } = useTheme();
@@ -87,11 +98,11 @@ export function PriceChart({
 
   if (candles.length === 0) {
     return (
-      <div className="flex items-center justify-center text-sm text-ink-faint" style={{ height }}>
-        No candle data yet — ingest candles from the exchange to draw the chart.
+      <div className="flex items-center justify-center text-sm text-ink-faint text-center px-4" style={{ height }}>
+        {t('noCandles')}
       </div>
     );
   }
 
-  return <div ref={containerRef} style={{ height }} />;
+  return <div ref={containerRef} dir="ltr" style={{ height }} />;
 }

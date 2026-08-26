@@ -2,14 +2,17 @@
 
 import type { ReactNode } from 'react';
 import { Moon, Sun } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { BotStatus } from '../lib/types';
 import { useTheme } from '../lib/theme';
 
 /* ---------- Brand ---------- */
 
 export function BrandMark({ size = 28, withText = false }: { size?: number; withText?: boolean }) {
+  const t = useTranslations('common');
   return (
     <span className="inline-flex items-center gap-2.5">
+      {/* Brand glyph: direction-neutral, intentionally never mirrored. */}
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden>
         <rect
           x="1"
@@ -38,8 +41,12 @@ export function BrandMark({ size = 28, withText = false }: { size?: number; with
       </svg>
       {withText && (
         <span className="leading-none">
-          <span className="block text-[15px] font-semibold tracking-tight text-ink">Wallex Grid Bot</span>
-          <span className="block mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-faint">Spot Grid Engine</span>
+          <span className="block text-[15px] font-semibold tracking-tight text-ink">
+            {t('appName')}
+          </span>
+          <span className="block mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-faint">
+            {t('brandTagline')}
+          </span>
         </span>
       )}
     </span>
@@ -50,7 +57,8 @@ export function BrandMark({ size = 28, withText = false }: { size?: number; with
 
 export function ThemeToggle({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const { theme, toggle, mounted } = useTheme();
-  const label = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  const t = useTranslations('common.theme');
+  const label = theme === 'dark' ? t('toLight') : t('toDark');
   const dim = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8';
   return (
     <button
@@ -82,7 +90,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 export function CardHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="card-head">
-      <div>
+      <div className="min-w-0">
         <h3 className="card-title">{title}</h3>
         {subtitle && <p className="card-subtitle">{subtitle}</p>}
       </div>
@@ -94,11 +102,11 @@ export function CardHeader({ title, subtitle, actions }: { title: ReactNode; sub
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="page-head">
-      <div>
+      <div className="min-w-0">
         <h2 className="page-title">{title}</h2>
         {subtitle && <p className="page-subtitle">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-3">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
     </div>
   );
 }
@@ -191,43 +199,47 @@ const statusDot: Partial<Record<BotStatus, string>> = {
 };
 
 export function StatusBadge({ status }: { status: BotStatus }) {
+  const t = useTranslations('common.botStatus');
   return (
     <span className={`badge ${statusColors[status] || statusColors.DRAFT}`}>
       {statusDot[status] && <span className={`glow-dot ${statusDot[status]}`} />}
-      {status.replace('_', ' ')}
+      {t(String(status) as 'RUNNING')}
     </span>
   );
 }
 
 export function ModeBadge({ mode }: { mode: 'DRY_RUN' | 'LIVE' }) {
+  const t = useTranslations('common.mode');
   return mode === 'LIVE' ? (
     <span className="badge bg-down/10 text-down ring-down/25">
       <span className="glow-dot bg-down animate-pulse-dot" />
-      Live
+      {t('LIVE')}
     </span>
   ) : (
-    <span className="badge bg-warn/10 text-warn ring-warn/25">Dry Run</span>
+    <span className="badge bg-warn/10 text-warn ring-warn/25">{t('DRY_RUN')}</span>
   );
 }
 
 export function SideBadge({ side }: { side: 'BUY' | 'SELL' }) {
+  const t = useTranslations('common.side');
   return (
     <span
       className={`badge ${side === 'BUY' ? 'bg-up/10 text-up ring-up/25' : 'bg-down/10 text-down ring-down/25'}`}
     >
-      {side}
+      {t(side)}
     </span>
   );
 }
 
 export function LevelBadge({ level }: { level: string }) {
+  const t = useTranslations('common.level');
   const cls =
     level === 'ERROR'
       ? 'bg-down/10 text-down ring-down/25'
       : level === 'WARN'
         ? 'bg-warn/10 text-warn ring-warn/25'
         : 'bg-info/10 text-info ring-info/25';
-  return <span className={`badge ${cls}`}>{level}</span>;
+  return <span className={`badge ${cls}`}>{t(level as 'INFO')}</span>;
 }
 
 /* ---------- Buttons ---------- */
@@ -306,7 +318,7 @@ export function ErrorBanner({ message }: { message: ReactNode }) {
       <svg className="w-5 h-5 shrink-0 text-down mt-0.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M12 21a9 9 0 100-18 9 9 0 000 18z" />
       </svg>
-      <p className="text-sm text-down">{message}</p>
+      <p className="text-sm text-down leading-relaxed">{message}</p>
     </div>
   );
 }
@@ -329,6 +341,12 @@ export function Notice({ tone = 'info', message }: { tone?: 'info' | 'warn' | 's
 
 /* ---------- Modals ---------- */
 
+/**
+ * Action-row convention (see docs/RTL_AUDIT.md): the primary/confirm action is
+ * always the LAST child (trailing/"end" side). Flexbox mirrors this position
+ * automatically under RTL, so the meaning-to-position mapping stays
+ * consistent in both locales.
+ */
 export function Modal({
   open,
   title,
@@ -344,9 +362,9 @@ export function Modal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="fixed inset-0 bg-deep/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative card shadow-pop max-w-md w-full mx-4 animate-[fadeIn_.15s_ease-out]">
+      <div className="relative card shadow-pop max-w-md w-full animate-[fadeIn_.15s_ease-out]">
         <div className="card-head">
           <h3 className="card-title">{title}</h3>
         </div>
@@ -361,7 +379,7 @@ export function ConfirmModal({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   danger = false,
   onConfirm,
   onCancel,
@@ -376,6 +394,7 @@ export function ConfirmModal({
   onCancel: () => void;
   busy?: boolean;
 }) {
+  const t = useTranslations('common.actions');
   return (
     <Modal
       open={open}
@@ -384,10 +403,10 @@ export function ConfirmModal({
       actions={
         <>
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy}>
-            {busy ? 'Working…' : confirmLabel}
+            {busy ? t('working') : (confirmLabel ?? t('confirm'))}
           </Button>
         </>
       }

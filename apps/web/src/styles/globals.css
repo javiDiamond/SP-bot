@@ -74,6 +74,24 @@
     background-attachment: fixed;
   }
 
+  /*
+   * Persian UI font (Vazirmatn). Scoped to <html lang="fa"> so LTR locales
+   * never download the font files. Tailwind's preflight makes all elements
+   * (including form controls) inherit the body font, so one rule suffices.
+   */
+  html[lang='fa'] body {
+    font-family: var(--font-vazirmatn), ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+      Tahoma, sans-serif;
+  }
+
+  /* Uppercase/tracking styles tuned for Latin scripts look wrong in Persian. */
+  html[lang='fa'] .label,
+  html[lang='fa'] .card-title,
+  html[lang='fa'] .page-title,
+  html[lang='fa'] .table thead th {
+    letter-spacing: 0;
+  }
+
   ::selection {
     background: rgb(var(--accent) / 0.30);
   }
@@ -180,10 +198,15 @@
   }
 
   .select {
-    @apply input appearance-none pr-8 bg-no-repeat cursor-pointer;
+    @apply input appearance-none pe-8 bg-no-repeat cursor-pointer;
     background-image: var(--select-chevron);
     background-position: right 0.6rem center;
     background-size: 0.9rem;
+  }
+
+  /* Mirror the chevron to the inline-end side in RTL. */
+  [dir='rtl'] .select {
+    background-position: left 0.6rem center;
   }
 
   .field-hint {
@@ -204,7 +227,7 @@
   }
 
   .table thead th {
-    @apply px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-faint
+    @apply px-4 py-2.5 text-start text-[11px] font-semibold uppercase tracking-wider text-ink-faint
       border-b border-edge whitespace-nowrap;
   }
 

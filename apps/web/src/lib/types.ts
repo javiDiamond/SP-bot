@@ -308,6 +308,7 @@ export interface UserRow {
   id: string;
   email: string;
   role: 'ADMIN' | 'TRADER' | 'VIEWER';
+  preferredLocale?: 'en' | 'fa' | null;
 }
 
 export interface CandleRow {

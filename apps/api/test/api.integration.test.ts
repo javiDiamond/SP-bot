@@ -155,6 +155,57 @@ describe('API integration', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().data.email).toBe(adminEmail);
+    expect(res.json().data.preferredLocale).toBeNull();
+  });
+
+  it('PATCH /api/auth/me persists preferredLocale', async t => {
+    if (!available) return t.skip();
+    const noAuth = await app!.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      payload: { preferredLocale: 'fa' },
+    });
+    expect(noAuth.statusCode).toBe(401);
+
+    const bad = await app!.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { preferredLocale: 'de' },
+    });
+    expect(bad.statusCode).toBe(400);
+
+    const set = await app!.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { preferredLocale: 'fa' },
+    });
+    expect(set.statusCode).toBe(200);
+    expect(set.json().data.preferredLocale).toBe('fa');
+
+    const me = await app!.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(me.json().data.preferredLocale).toBe('fa');
+
+    const login = await app!.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: adminEmail, password: adminPassword },
+    });
+    expect(login.json().data.user.preferredLocale).toBe('fa');
+
+    const cleared = await app!.inject({
+      method: 'PATCH',
+      url: '/api/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { preferredLocale: null },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().data.preferredLocale).toBeNull();
   });
 
   it('creates a dry-run exchange account and masks the API key', async t => {

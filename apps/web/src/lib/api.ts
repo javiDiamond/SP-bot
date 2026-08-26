@@ -96,8 +96,10 @@ export async function apiFetch<T = unknown>(
 
   if (res.status === 401 && auth) {
     setToken(null);
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
+    if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+      // Preserve the active locale prefix on forced sign-out redirects.
+      const locale = document.documentElement.lang === 'fa' ? 'fa' : 'en';
+      window.location.href = `/${locale}/login`;
     }
     throw new ApiError(401, 'Session expired');
   }
@@ -120,11 +122,20 @@ export async function apiFetch<T = unknown>(
 export const api = {
   // auth
   login: (email: string, password: string) =>
-    apiFetch<{ user: { id: string; email: string; role: string }; token: string }>(
-      '/api/auth/login',
-      { method: 'POST', body: { email, password }, auth: false },
+    apiFetch<{
+      user: { id: string; email: string; role: string; preferredLocale?: string | null };
+      token: string;
+    }>('/api/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+  me: () =>
+    apiFetch<{ id: string; email: string; role: string; preferredLocale?: string | null }>(
+      '/api/auth/me',
     ),
-  me: () => apiFetch<{ id: string; email: string; role: string }>('/api/auth/me'),
+  /** Persist the authenticated user's UI language preference (en | fa). */
+  updatePreferredLocale: (preferredLocale: string) =>
+    apiFetch<{ preferredLocale: string }>('/api/auth/me', {
+      method: 'PATCH',
+      body: { preferredLocale },
+    }),
 
   // markets
   markets: (refresh?: boolean) =>

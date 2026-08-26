@@ -4,18 +4,32 @@
 
 import { FastifyPluginAsync } from 'fastify';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { LoginSchema, RegisterSchema } from '@wallex/shared';
 import getPrismaClient from '../lib/database.js';
 import { authenticate, getAuthUserId } from '../middleware/auth.js';
 import { writeAuditLog } from '../lib/audit.js';
 
+/** Supported UI locales for the per-user language preference. */
+const SUPPORTED_LOCALES = ['en', 'fa'] as const;
+
+const updateMeSchema = z.object({
+  preferredLocale: z.enum(SUPPORTED_LOCALES).nullable(),
+});
+
 const authRoutes: FastifyPluginAsync = async fastify => {
   const prisma = getPrismaClient();
 
-  const publicUser = (user: { id: string; email: string; role: string }) => ({
+  const publicUser = (user: {
+    id: string;
+    email: string;
+    role: string;
+    preferredLocale?: string | null;
+  }) => ({
     id: user.id,
     email: user.email,
     role: user.role,
+    preferredLocale: user.preferredLocale ?? null,
   });
 
   /**
@@ -142,7 +156,7 @@ const authRoutes: FastifyPluginAsync = async fastify => {
       const userId = getAuthUserId(request);
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, email: true, role: true, createdAt: true },
+        select: { id: true, email: true, role: true, preferredLocale: true, createdAt: true },
       });
 
       if (!user) {
@@ -153,6 +167,45 @@ const authRoutes: FastifyPluginAsync = async fastify => {
     } catch (error: any) {
       fastify.log.error(error, 'Failed to get current user');
       return reply.code(500).send({ success: false, error: 'Failed to get user info' });
+    }
+  });
+
+  /**
+   * PATCH /api/auth/me
+   * Update mutable profile fields of the current user.
+   * Currently supports: preferredLocale ('en' | 'fa' | null).
+   */
+  fastify.patch('/me', { preHandler: [authenticate] }, async (request, reply) => {
+    try {
+      const userId = getAuthUserId(request);
+      const validated = updateMeSchema.parse(request.body);
+
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { preferredLocale: validated.preferredLocale },
+        select: { id: true, email: true, role: true, preferredLocale: true },
+      });
+
+      await writeAuditLog({
+        userId,
+        action: 'user.update',
+        resource: 'user',
+        resourceId: userId,
+        data: { preferredLocale: validated.preferredLocale },
+        request,
+      });
+
+      return { success: true, data: user };
+    } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return reply.code(400).send({
+          success: false,
+          error: 'Validation error',
+          details: error.errors,
+        });
+      }
+      fastify.log.error(error, 'Failed to update current user');
+      return reply.code(500).send({ success: false, error: 'Failed to update user' });
     }
   });
 };
