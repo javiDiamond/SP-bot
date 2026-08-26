@@ -1,15 +1,14 @@
 /**
  * Resolve the API base URL at runtime so the dashboard works behind
- * Codespaces / tunnel port forwarding, where the browser origin of the
- * dashboard and the API are on different forwarded hostnames.
+ * Codespaces / tunnel port forwarding, where cross-origin API hosts are
+ * blocked by the forwarded-port proxy (preflight requests carry no session
+ * cookie). The dashboard therefore uses same-origin /api paths proxied by
+ * Next.js rewrites (see next.config.js -> API_PROXY_TARGET).
  *
  * Precedence:
  * 1. NEXT_PUBLIC_API_URL / API_URL when explicitly set at build time
- * 2. Browser: GitHub Codespaces forwarded host (<id>-3000.app.github.dev ->
- *    swap the port segment to 4000)
- * 3. Browser: localhost dev (any port -> :4000)
- * 4. Browser: same origin (reverse-proxy setups)
- * 5. SSR / fallback: http://localhost:4000
+ * 2. Browser: same origin (all setups; Next.js rewrites proxy to the API)
+ * 3. SSR / fallback: http://localhost:4000
  */
 function resolveApiBaseUrl(): string {
   const env =
@@ -20,16 +19,6 @@ function resolveApiBaseUrl(): string {
 
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
-
-    const codespaces = hostname.match(/^(.*-)(\d+)\.app\.github\.dev$/);
-    if (codespaces) {
-      return `https://${codespaces[1]}4000.app.github.dev`;
-    }
-
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `http://${hostname}:4000`;
-    }
-
     if (protocol && hostname) {
       return port ? `${protocol}//${hostname}:${port}` : `${protocol}//${hostname}`;
     }

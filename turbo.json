@@ -7,6 +7,7 @@
     },
     "build": {
       "dependsOn": ["^build", "@wallex/db#db:generate"],
+      "env": ["API_PROXY_TARGET", "NEXT_PUBLIC_API_URL", "NODE_ENV"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "dev": {

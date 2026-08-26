@@ -5,11 +5,16 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable pnpm
 
-# Optional: bake a fixed API base URL into the client bundle. Leave unset to
-# let the dashboard derive the API origin from window.location at runtime
-# (required for Codespaces / tunnel port forwarding).
+# Optional: bake a fixed API base URL into the client bundle. Leave unset so
+# the dashboard uses same-origin /api paths, proxied to API_PROXY_TARGET by
+# Next.js rewrites (required for Codespaces / tunnel port forwarding).
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+# Same-origin /api rewrite target, resolved at build time (Next.js persists
+# rewrites at build). Inside compose this reaches the API service by name.
+ARG API_PROXY_TARGET=http://api:4000
+ENV API_PROXY_TARGET=${API_PROXY_TARGET}
 
 # Copy workspace manifests (all of them so pnpm can resolve the workspace graph)
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* turbo.json tsconfig.base.json ./
