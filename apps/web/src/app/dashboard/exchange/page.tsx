@@ -154,7 +154,7 @@ export default function ExchangePage() {
                           Live
                         </span>
                       ) : (
-                        <span className="badge bg-white/[0.05] text-ink-dim ring-white/10">dry-run only</span>
+                        <span className="badge badge-neutral">dry-run only</span>
                       )}
                     </td>
                     <td>

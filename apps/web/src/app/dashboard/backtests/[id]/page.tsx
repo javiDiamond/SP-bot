@@ -25,7 +25,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: '
 }
 
 const STATUS_CHIP: Record<string, string> = {
-  PENDING: 'bg-white/[0.05] text-ink-dim ring-white/10',
+  PENDING: 'badge-neutral',
   RUNNING: 'bg-info/10 text-info ring-info/25',
   COMPLETED: 'bg-up/10 text-up ring-up/25',
   FAILED: 'bg-down/10 text-down ring-down/25',

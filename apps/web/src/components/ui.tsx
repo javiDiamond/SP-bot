@@ -1,7 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import type { BotStatus } from '../lib/types';
+import { useTheme } from '../lib/theme';
 
 /* ---------- Brand ---------- */
 
@@ -9,11 +11,30 @@ export function BrandMark({ size = 28, withText = false }: { size?: number; with
   return (
     <span className="inline-flex items-center gap-2.5">
       <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden>
-        <rect x="1" y="1" width="30" height="30" rx="8" fill="rgba(45,212,160,0.10)" stroke="rgba(45,212,160,0.45)" />
-        <path d="M7 20l4.5-5 3.5 3.5L20.5 11 25 16" stroke="#2DD4A0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="7" cy="20" r="1.6" fill="#2DD4A0" />
-        <circle cx="25" cy="16" r="1.6" fill="#2DD4A0" />
-        <path d="M7 24.5h18" stroke="rgba(232,237,245,0.35)" strokeWidth="1.4" strokeLinecap="round" strokeDasharray="2.5 3" />
+        <rect
+          x="1"
+          y="1"
+          width="30"
+          height="30"
+          rx="8"
+          style={{ fill: 'rgb(var(--accent) / 0.10)', stroke: 'rgb(var(--accent) / 0.45)' }}
+        />
+        <path
+          d="M7 20l4.5-5 3.5 3.5L20.5 11 25 16"
+          style={{ stroke: 'rgb(var(--accent))' }}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="7" cy="20" r="1.6" style={{ fill: 'rgb(var(--accent))' }} />
+        <circle cx="25" cy="16" r="1.6" style={{ fill: 'rgb(var(--accent))' }} />
+        <path
+          d="M7 24.5h18"
+          style={{ stroke: 'rgb(var(--ink) / 0.35)' }}
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeDasharray="2.5 3"
+        />
       </svg>
       {withText && (
         <span className="leading-none">
@@ -22,6 +43,33 @@ export function BrandMark({ size = 28, withText = false }: { size?: number; with
         </span>
       )}
     </span>
+  );
+}
+
+/* ---------- Theme ---------- */
+
+export function ThemeToggle({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const { theme, toggle, mounted } = useTheme();
+  const label = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  const dim = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8';
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={label}
+      title={label}
+      className={`inline-flex ${dim} items-center justify-center rounded-lg border border-edge bg-panel text-ink-dim
+        transition-colors hover:text-ink hover:bg-overlay
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
+    >
+      {!mounted ? (
+        <span className="h-[15px] w-[15px]" />
+      ) : theme === 'dark' ? (
+        <Sun className="h-[15px] w-[15px]" />
+      ) : (
+        <Moon className="h-[15px] w-[15px]" />
+      )}
+    </button>
   );
 }
 
@@ -121,13 +169,13 @@ export function StatCard({
 /* ---------- Badges ---------- */
 
 const statusColors: Record<BotStatus, string> = {
-  DRAFT: 'bg-white/[0.05] text-ink-dim ring-white/10',
+  DRAFT: 'badge-neutral',
   STARTING: 'bg-info/10 text-info ring-info/25',
   RUNNING: 'bg-up/10 text-up ring-up/25',
   PAUSING: 'bg-warn/10 text-warn ring-warn/25',
   PAUSED: 'bg-warn/10 text-warn ring-warn/25',
-  STOPPING: 'bg-orange-400/10 text-orange-400 ring-orange-400/25',
-  STOPPED: 'bg-white/[0.05] text-ink-dim ring-white/10',
+  STOPPING: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/25',
+  STOPPED: 'badge-neutral',
   ERROR: 'bg-down/10 text-down ring-down/25',
   RANGE_EXITED: 'bg-violet/10 text-violet ring-violet/25',
   KILLED: 'bg-down/15 text-down ring-down/30',

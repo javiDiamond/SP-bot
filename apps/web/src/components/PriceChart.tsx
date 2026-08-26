@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { createChart, ColorType, LineStyle, type IChartApi } from 'lightweight-charts';
+import { themeColor, useTheme } from '../lib/theme';
 
 export interface ChartCandle {
   timestamp: string; // ISO
@@ -22,6 +23,10 @@ export function PriceChart({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const { theme } = useTheme();
+
+  const candleKey = JSON.stringify(candles.map((c) => c.timestamp));
+  const levelKey = JSON.stringify(gridLevels.map((g) => g.price));
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -30,24 +35,24 @@ export function PriceChart({
       height,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#5C6879',
+        textColor: themeColor('--ink-faint'),
       },
       grid: {
-        vertLines: { color: 'rgba(148,163,184,0.07)' },
-        horzLines: { color: 'rgba(148,163,184,0.07)' },
+        vertLines: { color: themeColor('--edge-tint', 0.08) },
+        horzLines: { color: themeColor('--edge-tint', 0.08) },
       },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'rgba(148,163,184,0.15)' },
-      rightPriceScale: { borderColor: 'rgba(148,163,184,0.15)' },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: themeColor('--edge-tint', 0.16) },
+      rightPriceScale: { borderColor: themeColor('--edge-tint', 0.16) },
       autoSize: true,
     });
     chartRef.current = chart;
 
     const series = chart.addCandlestickSeries({
-      upColor: '#10b981',
-      downColor: '#ef4444',
+      upColor: themeColor('--up'),
+      downColor: themeColor('--down'),
       borderVisible: false,
-      wickUpColor: '#10b981',
-      wickDownColor: '#ef4444',
+      wickUpColor: themeColor('--up'),
+      wickDownColor: themeColor('--down'),
     });
 
     series.setData(
@@ -63,7 +68,7 @@ export function PriceChart({
     for (const lvl of gridLevels) {
       series.createPriceLine({
         price: Number(lvl.price),
-        color: lvl.active ? '#2DD4A0' : 'rgba(148,163,184,0.45)',
+        color: lvl.active ? themeColor('--accent') : themeColor('--edge-tint', 0.45),
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: false,
@@ -78,7 +83,7 @@ export function PriceChart({
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(candles.map((c) => c.timestamp)), JSON.stringify(gridLevels.map((g) => g.price)), height]);
+  }, [candleKey, levelKey, height, theme]);
 
   if (candles.length === 0) {
     return (

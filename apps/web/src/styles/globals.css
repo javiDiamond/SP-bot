@@ -3,7 +3,61 @@
 @tailwind utilities;
 
 @layer base {
+  /* ---------- Light — "porcelain" ---------- */
   :root {
+    --deep: 243 246 250;
+    --panel: 255 255 255;
+    --raised: 241 245 250;
+    --overlay: 230 236 244;
+    --ink: 16 24 40;
+    --ink-dim: 71 85 105;
+    --ink-faint: 100 116 139;
+    --edge-tint: 71 85 105;
+    --gridline: 71 85 105;
+    --accent: 10 127 93;
+    --accent-hover: 7 104 76;
+    --on-accent: 255 255 255;
+    --on-danger: 255 255 255;
+    --up: 5 150 105;
+    --down: 220 38 38;
+    --warn: 180 83 9;
+    --info: 2 132 199;
+    --violet: 124 58 237;
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.08);
+    --shadow-pop: 0 16px 48px -16px rgb(16 24 40 / 0.28), 0 0 0 1px rgb(16 24 40 / 0.05);
+    --btn-glow: 0 4px 14px -4px rgb(10 127 93 / 0.40);
+    --btn-glow-hover: 0 6px 20px -4px rgb(10 127 93 / 0.50);
+    --scrollbar-a: 0.35;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    color-scheme: light;
+  }
+
+  /* ---------- Dark — "deep space" ---------- */
+  .dark {
+    --deep: 10 14 21;
+    --panel: 15 20 29;
+    --raised: 19 26 38;
+    --overlay: 24 33 48;
+    --ink: 233 238 246;
+    --ink-dim: 148 163 184;
+    --ink-faint: 94 108 128;
+    --edge-tint: 148 163 184;
+    --gridline: 148 163 184;
+    --accent: 45 212 160;
+    --accent-hover: 70 226 181;
+    --on-accent: 4 22 15;
+    --on-danger: 43 7 7;
+    --up: 52 211 153;
+    --down: 248 113 113;
+    --warn: 251 191 36;
+    --info: 56 189 248;
+    --violet: 167 139 250;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.30), 0 0 0 1px rgb(148 163 184 / 0.06);
+    --shadow-pop: 0 12px 40px -12px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(148 163 184 / 0.08);
+    --btn-glow: 0 0 18px -4px rgb(45 212 160 / 0.55);
+    --btn-glow-hover: 0 0 22px -4px rgb(45 212 160 / 0.70);
+    --scrollbar-a: 0.22;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
     color-scheme: dark;
   }
 
@@ -15,26 +69,26 @@
   body {
     @apply bg-deep text-ink;
     background-image:
-      radial-gradient(1200px 600px at 80% -10%, rgba(45, 212, 160, 0.05), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgba(56, 189, 248, 0.04), transparent 60%);
+      radial-gradient(1200px 600px at 80% -10%, rgb(var(--accent) / 0.05), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgb(var(--info) / 0.04), transparent 60%);
     background-attachment: fixed;
   }
 
   ::selection {
-    background: rgba(45, 212, 160, 0.28);
+    background: rgb(var(--accent) / 0.30);
   }
 
-  /* Slim dark scrollbars */
+  /* Slim theme-aware scrollbars */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
+    scrollbar-color: rgb(var(--edge-tint) / var(--scrollbar-a)) transparent;
   }
   *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   *::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.22);
+    background: rgb(var(--edge-tint) / var(--scrollbar-a));
     border-radius: 8px;
   }
   *::-webkit-scrollbar-track {
@@ -95,8 +149,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-accent text-[#04120C] hover:bg-accent-hover
-      shadow-[0_0_18px_-4px_rgba(45,212,160,0.55)] hover:shadow-[0_0_22px_-4px_rgba(45,212,160,0.7)];
+    @apply btn bg-accent text-on-accent hover:bg-accent-hover shadow-glow hover:shadow-glow-hover;
   }
 
   .btn-secondary {
@@ -104,11 +157,11 @@
   }
 
   .btn-danger {
-    @apply btn bg-down/90 text-[#2b0707] hover:bg-down;
+    @apply btn bg-down/90 text-on-danger hover:bg-down;
   }
 
   .btn-ghost {
-    @apply btn text-ink-dim hover:text-ink hover:bg-white/[0.04];
+    @apply btn text-ink-dim hover:text-ink hover:bg-ink/[0.05];
   }
 
   .btn-up {
@@ -128,7 +181,7 @@
 
   .select {
     @apply input appearance-none pr-8 bg-no-repeat cursor-pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2397A3B6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-image: var(--select-chevron);
     background-position: right 0.6rem center;
     background-size: 0.9rem;
   }
@@ -156,7 +209,7 @@
   }
 
   .table tbody tr {
-    @apply border-b border-edge/60 transition-colors;
+    @apply border-b border-edge transition-colors;
   }
 
   .table tbody tr:last-child {
@@ -164,7 +217,7 @@
   }
 
   .table tbody tr:hover {
-    @apply bg-white/[0.025];
+    @apply bg-ink/[0.03];
   }
 
   .table td {
@@ -180,6 +233,10 @@
   .badge {
     @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold
       uppercase tracking-wide ring-1 ring-inset;
+  }
+
+  .badge-neutral {
+    @apply bg-ink/[0.05] text-ink-dim ring-ink/10;
   }
 
   /* ---------- Misc ---------- */
@@ -200,8 +257,8 @@
   /* Grid-line backdrop motif (brand identity) */
   .bg-gridlines {
     background-image:
-      linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px);
+      linear-gradient(rgb(var(--gridline) / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--gridline) / 0.06) 1px, transparent 1px);
     background-size: 44px 44px;
   }
 
@@ -211,6 +268,6 @@
   }
 
   .text-gradient {
-    @apply text-transparent bg-clip-text bg-gradient-to-r from-accent via-[#5CE8BF] to-info;
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-accent via-accent-hover to-info;
   }
 }

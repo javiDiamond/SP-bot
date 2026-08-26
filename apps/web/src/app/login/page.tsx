@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../lib/store';
 import { getToken } from '../../lib/api';
-import { BrandMark } from '../../components/ui';
+import { BrandMark, ThemeToggle } from '../../components/ui';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,10 +34,13 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 py-12 overflow-hidden">
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="absolute inset-0 bg-gridlines bg-gridlines-fade" aria-hidden />
       <div
         className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(45,212,160,0.10), transparent 65%)' }}
+        style={{ background: 'radial-gradient(circle, rgb(var(--accent) / 0.10), transparent 65%)' }}
         aria-hidden
       />
 
@@ -92,7 +95,7 @@ export default function LoginPage() {
             <button type="submit" disabled={busy} className="btn-primary btn-md w-full">
               {busy ? (
                 <>
-                  <span className="h-4 w-4 rounded-full border-2 border-[#04120C]/30 border-t-[#04120C] animate-spin" />
+                  <span className="h-4 w-4 rounded-full border-2 border-on-accent/30 border-t-on-accent animate-spin" />
                   Signing in…
                 </>
               ) : (

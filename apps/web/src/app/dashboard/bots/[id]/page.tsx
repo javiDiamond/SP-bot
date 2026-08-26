@@ -40,7 +40,7 @@ function LevelStatusBadge({ status }: { status: string }) {
       ? 'bg-down/10 text-down ring-down/25'
       : status === 'ERROR'
         ? 'bg-down/15 text-down ring-down/30'
-        : 'bg-white/[0.05] text-ink-dim ring-white/10';
+        : 'badge-neutral';
   return <span className={`badge ${cls}`}>{status.replace(/_/g, ' ')}</span>;
 }
 

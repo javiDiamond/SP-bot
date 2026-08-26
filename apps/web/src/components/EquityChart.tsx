@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { themeColor, useTheme } from '../lib/theme';
 
 export function EquityChart({
   points,
@@ -21,6 +22,8 @@ export function EquityChart({
   label?: string;
   height?: number;
 }) {
+  const { theme } = useTheme();
+
   if (points.length === 0) {
     return (
       <div className="flex items-center justify-center text-sm text-ink-faint" style={{ height }}>
@@ -45,32 +48,32 @@ export function EquityChart({
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
         <defs>
-          <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#2DD4A0" stopOpacity={0.28} />
-            <stop offset="95%" stopColor="#2DD4A0" stopOpacity={0} />
+          <linearGradient id={`equityGradient-${theme}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={themeColor('--accent')} stopOpacity={0.28} />
+            <stop offset="95%" stopColor={themeColor('--accent')} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.10)" />
-        <XAxis dataKey="t" tick={{ fontSize: 11, fill: '#5C6879' }} minTickGap={40} />
-        <YAxis tick={{ fontSize: 11, fill: '#5C6879' }} width={70} />
+        <CartesianGrid strokeDasharray="3 3" stroke={themeColor('--edge-tint', 0.10)} />
+        <XAxis dataKey="t" tick={{ fontSize: 11, fill: themeColor('--ink-faint') }} minTickGap={40} />
+        <YAxis tick={{ fontSize: 11, fill: themeColor('--ink-faint') }} width={70} />
         <Tooltip
           formatter={(value: any) => [Number(value).toFixed(4), label]}
           contentStyle={{
             fontSize: 12,
-            background: '#131B27',
-            border: '1px solid rgba(148,163,184,0.18)',
+            background: themeColor('--panel'),
+            border: `1px solid ${themeColor('--edge-tint', 0.18)}`,
             borderRadius: 8,
-            color: '#E8EDF5',
+            color: themeColor('--ink'),
           }}
-          labelStyle={{ color: '#97A3B6' }}
-          itemStyle={{ color: '#E8EDF5' }}
+          labelStyle={{ color: themeColor('--ink-dim') }}
+          itemStyle={{ color: themeColor('--ink') }}
         />
         <Area
           type="monotone"
           dataKey={valueKey}
-          stroke="#2DD4A0"
+          stroke={themeColor('--accent')}
           strokeWidth={2}
-          fill="url(#equityGradient)"
+          fill={`url(#equityGradient-${theme})`}
         />
       </AreaChart>
     </ResponsiveContainer>

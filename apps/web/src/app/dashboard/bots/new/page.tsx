@@ -432,7 +432,7 @@ export default function NewBotPage() {
                       type="checkbox"
                       checked={form.makerOnly}
                       onChange={(e) => set('makerOnly', e.target.checked)}
-                      className="h-4 w-4 rounded border-edge-strong bg-deep accent-[#2DD4A0] focus:ring-accent/40"
+                      className="h-4 w-4 rounded border-edge-strong bg-deep accent-accent focus:ring-accent/40"
                     />
                     Maker-only orders
                   </label>

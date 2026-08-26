@@ -12,9 +12,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  colorScheme: 'dark',
-  themeColor: '#070B10',
+  colorScheme: 'light dark',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F3F6FA' },
+    { media: '(prefers-color-scheme: dark)', color: '#0A0E15' },
+  ],
 };
+
+const themeInitScript = `(function(){try{var t=localStorage.getItem('wallex-theme');if(t!=='light')t='dark';var r=document.documentElement;r.classList.toggle('dark',t==='dark');r.style.colorScheme=t;}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 export default function RootLayout({
   children,
@@ -24,6 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${mono.variable}`}>
       <body className="font-sans">
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <Providers>{children}</Providers>
       </body>
     </html>

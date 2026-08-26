@@ -19,7 +19,7 @@ const RESOLUTIONS = [
 ];
 
 const STATUS_CHIP: Record<string, string> = {
-  PENDING: 'bg-white/[0.05] text-ink-dim ring-white/10',
+  PENDING: 'badge-neutral',
   RUNNING: 'bg-info/10 text-info ring-info/25',
   COMPLETED: 'bg-up/10 text-up ring-up/25',
   FAILED: 'bg-down/10 text-down ring-down/25',
@@ -310,7 +310,7 @@ export default function BacktestsPage() {
                   type="checkbox"
                   checked={form.makerOnly}
                   onChange={(e) => set('makerOnly', e.target.checked)}
-                  className="h-4 w-4 rounded border-edge-strong bg-deep accent-[#2DD4A0] focus:ring-accent/40"
+                  className="h-4 w-4 rounded border-edge-strong bg-deep accent-accent focus:ring-accent/40"
                 />
                 Maker-only fills
               </label>
@@ -362,7 +362,7 @@ export default function BacktestsPage() {
                           checked={selected.includes(bt.id)}
                           onChange={() => toggleSelected(bt.id)}
                           disabled={bt.status !== 'COMPLETED' && !selected.includes(bt.id)}
-                          className="h-4 w-4 rounded border-edge-strong bg-deep accent-[#2DD4A0] focus:ring-accent/40"
+                          className="h-4 w-4 rounded border-edge-strong bg-deep accent-accent focus:ring-accent/40"
                         />
                       </td>
                       <td>

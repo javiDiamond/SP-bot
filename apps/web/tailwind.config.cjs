@@ -1,4 +1,5 @@
 module.exports = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -7,28 +8,36 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Surfaces
-        deep: '#070B10',
-        panel: '#0D131C',
-        raised: '#131B27',
-        overlay: '#182234',
+        // Surfaces (theme-driven CSS variables)
+        deep: 'rgb(var(--deep) / <alpha-value>)',
+        panel: 'rgb(var(--panel) / <alpha-value>)',
+        raised: 'rgb(var(--raised) / <alpha-value>)',
+        overlay: 'rgb(var(--overlay) / <alpha-value>)',
         // Text
-        ink: { DEFAULT: '#E8EDF5', dim: '#97A3B6', faint: '#5C6879' },
+        ink: {
+          DEFAULT: 'rgb(var(--ink) / <alpha-value>)',
+          dim: 'rgb(var(--ink-dim) / <alpha-value>)',
+          faint: 'rgb(var(--ink-faint) / <alpha-value>)',
+        },
         // Borders
-        edge: { DEFAULT: 'rgba(148,163,184,0.10)', strong: 'rgba(148,163,184,0.20)' },
+        edge: {
+          DEFAULT: 'rgb(var(--edge-tint) / 0.10)',
+          strong: 'rgb(var(--edge-tint) / 0.22)',
+        },
         // Brand accent (mint emerald — profit-forward grid trading identity)
         accent: {
-          DEFAULT: '#2DD4A0',
-          hover: '#26BE8F',
-          soft: 'rgba(45,212,160,0.12)',
-          glow: 'rgba(45,212,160,0.28)',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          hover: 'rgb(var(--accent-hover) / <alpha-value>)',
         },
         // Semantic trading colors
-        up: { DEFAULT: '#34D399', soft: 'rgba(52,211,153,0.12)' },
-        down: { DEFAULT: '#F87171', soft: 'rgba(248,113,113,0.12)' },
-        warn: { DEFAULT: '#FBBF24', soft: 'rgba(251,191,36,0.12)' },
-        info: { DEFAULT: '#38BDF8', soft: 'rgba(56,189,248,0.12)' },
-        violet: { DEFAULT: '#A78BFA', soft: 'rgba(167,139,250,0.12)' },
+        up: 'rgb(var(--up) / <alpha-value>)',
+        down: 'rgb(var(--down) / <alpha-value>)',
+        warn: 'rgb(var(--warn) / <alpha-value>)',
+        info: 'rgb(var(--info) / <alpha-value>)',
+        violet: 'rgb(var(--violet) / <alpha-value>)',
+        // Foreground on filled semantic buttons
+        'on-accent': 'rgb(var(--on-accent) / <alpha-value>)',
+        'on-danger': 'rgb(var(--on-danger) / <alpha-value>)',
       },
       fontFamily: {
         sans: [
@@ -53,8 +62,10 @@ module.exports = {
         ],
       },
       boxShadow: {
-        card: '0 1px 2px rgba(0,0,0,0.30), 0 0 0 1px rgba(148,163,184,0.06)',
-        pop: '0 12px 40px -12px rgba(0,0,0,0.65), 0 0 0 1px rgba(148,163,184,0.08)',
+        card: 'var(--shadow-card)',
+        pop: 'var(--shadow-pop)',
+        glow: 'var(--btn-glow)',
+        'glow-hover': 'var(--btn-glow-hover)',
       },
       keyframes: {
         'pulse-dot': {

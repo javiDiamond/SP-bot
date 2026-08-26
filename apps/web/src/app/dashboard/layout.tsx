@@ -8,7 +8,7 @@ import { api } from '../../lib/api';
 import { useAuthStore } from '../../lib/store';
 import { onRealtimeEvent, startEventStream, stopEventStream } from '../../lib/useEventStream';
 import { getToken } from '../../lib/api';
-import { BrandMark } from '../../components/ui';
+import { BrandMark, ThemeToggle } from '../../components/ui';
 import type { SystemStatusData } from '../../lib/types';
 
 function Icon({ d }: { d: string }) {
@@ -143,8 +143,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-accent/10 text-accent shadow-[inset_2px_0_0_0_#2DD4A0]'
-                      : 'text-ink-dim hover:text-ink hover:bg-white/[0.04]'
+                      ? 'bg-accent/10 text-accent shadow-[inset_2px_0_0_0_rgb(var(--accent))]'
+                      : 'text-ink-dim hover:text-ink hover:bg-ink/[0.05]'
                   }`}
                 >
                   {item.icon}
@@ -192,9 +192,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       {user.email.charAt(0)}
                     </span>
                     <span className="hidden md:inline">{user.email}</span>
-                    <span className="badge bg-white/[0.05] text-ink-faint ring-white/10">{user.role}</span>
+                    <span className="badge-neutral badge">{user.role}</span>
                   </span>
                 )}
+                <ThemeToggle />
                 <button onClick={logout} className="btn-secondary btn-sm">
                   Sign out
                 </button>
@@ -211,7 +212,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     key={item.name}
                     href={item.href}
                     className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-medium ${
-                      isActive ? 'bg-accent/10 text-accent' : 'text-ink-dim hover:text-ink hover:bg-white/[0.04]'
+                      isActive ? 'bg-accent/10 text-accent' : 'text-ink-dim hover:text-ink hover:bg-ink/[0.05]'
                     }`}
                   >
                     {item.name}
