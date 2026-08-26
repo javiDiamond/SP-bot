@@ -171,6 +171,116 @@ This document records assumptions made during implementation due to unclear or m
 - Configurable header name
 - No timestamp/signature logic (unless docs clarify otherwise)
 
+## 16. i18n Library Choice
+
+**Assumption**: `next-intl` (v4) is the i18n layer for the dashboard.
+
+**Reason**: First-class Next.js App Router support — middleware-based locale-prefixed routing,
+server-rendered `<html lang dir>` from the root layout, `createNavigation` locale-aware
+links/router, ICU message format (pluralization + interpolation) for both `en` and `fa`, and
+no runtime reload requirement for locale switching.
+
+**Implementation**: `apps/web/src/i18n/{routing,navigation,request}.ts` +
+`apps/web/src/middleware.ts`; messages in `apps/web/messages/{en,fa}.json` with full key
+parity (verified by the string-audit script).
+
+## 17. Digit Style & Calendar Defaults
+
+**Assumption**: Financial figures (prices, quantities, balances, PnL, percentages, fees) are
+**always rendered with Western Arabic digits (0-9)** in both locales, via
+`Intl.NumberFormat(...-u-nu-latn)`. The configurable `digitStyle` preference
+(`latin` default, `persian` opt-in) applies **only to decorative text** such as pagination
+copy — never to trading figures.
+
+**Reason**: Exchange data, order entry, and operator muscle memory are built around Latin
+digits; mixing numeral systems in a trading UI is a documented source of input/reading errors.
+
+**Implementation**: `apps/web/src/lib/format.ts` (`fmtNum`/`fmtPnl` force `nu-latn`;
+`fmtCount` honours the preference) and `apps/web/src/lib/preferences.ts`
+(`wallex-display-prefs` localStorage key, surfaced on the Settings page).
+
+**Assumption**: Dates remain **Gregorian by default** in both locales. Jalali (Persian
+calendar) display is an **explicit opt-in** preference (`calendar: "jalali"`), implemented
+with `Intl.DateTimeFormat`'s built-in `calendar: "persian"` (no extra library needed), and
+still renders Latin digits.
+
+**Reason**: Candles, audit logs, and exchange timestamps are Gregorian-based; mixing calendars
+is a correctness risk in a trading tool.
+
+## 18. Chart RTL Handling
+
+**Assumption**: Chart canvases (lightweight-charts price chart, Recharts equity chart) stay
+**LTR** (`dir="ltr"` wrapper) even in the Persian UI. Surrounding titles, legends, labels and
+metric cards are fully RTL.
+
+**Reason**: Neither library supports mirrored rendering (time axis, price scale position,
+crosshair); time-series charts are conventionally read left-to-right even in RTL products.
+Keeping the canvas LTR guarantees grid-level price lines and the price axis stay numerically
+and positionally identical across locales. Documented in `docs/RTL_AUDIT.md`.
+
+## 19. Persian Font Choice
+
+**Assumption**: **Vazirmatn** (via `next/font/google`, SIL Open Font License — commercial use
+permitted) is the Persian UI font.
+
+**Reason**: Designed for UI screens, wide weight range, renders Latin digits well, open
+license. IRANSans is not freely licensed for embedding; Estedad was evaluated but Vazirmatn
+has better tabular-figure behavior.
+
+**Implementation**: The CSS variable is referenced only from an `html[lang='fa'] body` rule
+(`src/styles/globals.css`), so English users never download the font files. `letter-spacing`
+is zeroed for Persian on labels/titles/table headers (tracking breaks Arabic-script joining),
+and the font never auto-substitutes digits — financial figures stay Latin per §17.
+
+## 20. Modal Button Order in Both Directions
+
+**Assumption**: Primary/confirm action is always the **trailing ("end")** child of the modal
+action row; Cancel precedes it. Flexbox mirrors the row under `dir="rtl"`, so the
+meaning-to-position mapping is identical in both locales.
+
+**Reason**: Prevents destructive-action misclicks for operators switching languages mid-session
+(see `docs/RTL_AUDIT.md` — "Button-order convention").
+
+## 21. Locale Resolution Order
+
+**Assumption**: Resolution priority is: (1) locale in URL path → (2) authenticated user's
+`preferredLocale` (applied at login) → (3) `NEXT_LOCALE` cookie → (4) `Accept-Language`
+header → (5) default `en`.
+
+**Reason**: Matches the product spec; explicit URL always wins, then durable user preference,
+then browser hint.
+
+**Implementation**: `next-intl` middleware (cookie/Accept-Language), login flow redirect in
+`src/app/[locale]/login/page.tsx` (stored `preferredLocale`), backend PATCH
+`/api/auth/me` + `preferred_locale` column (migration
+`20260826112738_add_user_preferred_locale`).
+
+## 22. Server-Generated Content — Not Yet Localized
+
+The following server-generated artifacts intentionally remain **English-only** for this pass:
+
+- **CSV export headers** (`GET /api/backtests/:id/trades.csv`,
+  `GET /api/orders/fills/export.csv`) — English headers keep exports interoperable with
+  spreadsheet/analysis tooling.
+- **Email/notification templates** — the product sends no emails today; if added, they should
+  respect the user's `preferredLocale`.
+- **Log/audit/event payloads** (raw JSON in the Logs page, audit trail) — kept in English by
+  design for operability/compliance; only their UI chrome (labels, levels, filters) is
+  translated.
+- **Backend error codes/messages** — raw strings are never shown directly; the frontend maps
+  known errors to translation keys (`apps/web/src/lib/errors.ts`) and falls back to the raw
+  message only for novel failures.
+
+## 23. Language Switcher Presentation
+
+**Assumption**: The switcher shows **English / فارسی** with EN / فا indicators and a neutral
+language icon (lucide `Languages`) — **no national flags**, since neither language is tied to
+a single country. The Persian option is written in Persian script (`فارسی`), never
+transliterated.
+
+**Assumption**: Locale switching is a **client-side route transition** (`router.replace` with
+`{ locale }`) — no full page reload; route, query params and react-query cache are preserved.
+
 ---
 
 ## Safety Principles Applied

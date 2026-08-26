@@ -146,21 +146,6 @@ export function shortId(id: string): string {
   return id ? id.slice(0, 8) : DASH;
 }
 
-/**
- * Relative "time ago" using ICU plurals is handled in components via
- * translations; this returns the raw elapsed bucket so callers can pick the
- * correct ICU message. Kept for backwards compatibility.
- */
-export function timeAgo(ts: number | string): string {
-  const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
-  const diff = Date.now() - t;
-  if (diff < 5_000) return 'just now';
-  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return `${Math.floor(diff / 86_400_000)}d ago`;
-}
-
 export function toLocalInput(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';

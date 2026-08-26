@@ -57,6 +57,11 @@ services:
       ENABLE_LIVE_TRADING: ${ENABLE_LIVE_TRADING:-false}
       # Comma-separated exact origins; Codespaces *.app.github.dev auto-allowed in dev
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      # Global API rate limit. Dev default is raised so the Playwright e2e
+      # suite (many fast requests) does not trip the limiter; production
+      # should keep the strict 100/60s default from apps/api/src/config.ts.
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-10000}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
     ports:
       - "${API_PORT:-4000}:4000"
     depends_on:

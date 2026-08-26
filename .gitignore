@@ -77,6 +77,11 @@ Thumbs.db
 .playwright-mcp/
 *.png
 !docs/assets/*.png
+!apps/web/e2e/__screenshots__/**/*.png
+
+# Playwright e2e run artifacts (baselines under e2e/__screenshots__ are tracked)
+apps/web/test-results/
+apps/web/playwright-report/
 
 # Testing and coverage
 .coverage
