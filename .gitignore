@@ -73,6 +73,11 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Browser automation / screenshot artifacts
+.playwright-mcp/
+*.png
+!docs/assets/*.png
+
 # Testing and coverage
 .coverage
 coverage/
