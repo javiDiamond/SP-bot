@@ -5,7 +5,10 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable pnpm
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+# Optional: bake a fixed API base URL into the client bundle. Leave unset to
+# let the dashboard derive the API origin from window.location at runtime
+# (required for Codespaces / tunnel port forwarding).
+ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Copy workspace manifests (all of them so pnpm can resolve the workspace graph)
@@ -36,8 +39,6 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NODE_ENV=production
 
 RUN addgroup --system --gid 1001 nodejs

@@ -10,7 +10,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
-import { config } from './config.js';
+import { config, isProduction } from './config.js';
 import marketsRoutes from './routes/markets.js';
 import botsRoutes from './routes/bots.js';
 import authRoutes from './routes/auth.js';
@@ -37,8 +37,21 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     trustProxy: true,
   });
 
+  // CORS: comma-separated allow-list of exact origins. Wildcard "*" allows
+  // everything (not recommended outside local debugging). In non-production
+  // environments GitHub Codespaces forwarded origins are always allowed so
+  // the dashboard works behind automatic port forwarding.
+  const corsEnv = process.env.CORS_ORIGIN || 'http://localhost:3000';
+  const corsOrigin: boolean | (string | RegExp)[] =
+    corsEnv === '*'
+      ? true
+      : [
+          ...corsEnv.split(',').map((o) => o.trim()).filter(Boolean),
+          ...(!isProduction ? [/^https:\/\/[a-z0-9][a-z0-9-]*\.app\.github\.dev$/] : []),
+        ];
+
   await fastify.register(cors, {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
 
