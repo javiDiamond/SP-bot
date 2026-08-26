@@ -1,5 +1,6 @@
 import { PrismaClient } from '../generated';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -107,7 +108,6 @@ async function main() {
 
     if (!existingDemoAccount) {
       // Encrypt a dummy API key for demo purposes (64 hex chars = 32 bytes for AES-256)
-      const crypto = require('crypto');
       const dummyKey = 'demo_api_key_12345';
       const iv = crypto.randomBytes(16);
       const cipher = crypto.createCipheriv(

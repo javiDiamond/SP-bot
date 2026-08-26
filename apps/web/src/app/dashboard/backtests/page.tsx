@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { fmtDate } from '../../../lib/format';
 import { Button, EmptyState, ErrorBanner, Spinner } from '../../../components/ui';
@@ -34,7 +34,6 @@ function statusChip(status: string) {
 
 export default function BacktestsPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

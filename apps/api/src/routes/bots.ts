@@ -51,6 +51,13 @@ const botsRoutes: FastifyPluginAsync = async fastify => {
   fastify.get('/:id', async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
+      const userId = getAuthUserId(request);
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const owned = await loadOwnedBot(id, userId, user?.role === 'ADMIN');
+      if (!owned) {
+        return reply.code(404).send({ success: false, error: 'Bot not found' });
+      }
+
       const bot = await prisma.bot.findUnique({
         where: { id },
         include: {
@@ -122,6 +129,8 @@ const botsRoutes: FastifyPluginAsync = async fastify => {
         });
       }
 
+      // Percent values are stored as-is (e.g. 5 = 5%); the risk service
+      // converts to a fraction when evaluating limits.
       const bot = await prisma.bot.create({
         data: {
           userId,
@@ -134,12 +143,7 @@ const botsRoutes: FastifyPluginAsync = async fastify => {
           gridConfig: validated.gridConfig as object,
           maxQuoteExposure: validated.maxQuoteExposure,
           maxBaseExposure: validated.maxBaseExposure,
-          dailyLossLimitPercent:
-            validated.dailyLossLimitPercent !== undefined
-              ? validated.dailyLossLimitPercent / 100
-              : validated.gridConfig.dailyLossLimitPercent !== undefined
-                ? validated.gridConfig.dailyLossLimitPercent / 100
-                : undefined,
+          dailyLossLimitPercent: validated.dailyLossLimitPercent ?? validated.gridConfig.dailyLossLimitPercent,
         },
       });
 
@@ -184,10 +188,7 @@ const botsRoutes: FastifyPluginAsync = async fastify => {
           gridConfig: validated.gridConfig ? (validated.gridConfig as object) : undefined,
           maxQuoteExposure: validated.maxQuoteExposure,
           maxBaseExposure: validated.maxBaseExposure,
-          dailyLossLimitPercent:
-            validated.dailyLossLimitPercent !== undefined
-              ? validated.dailyLossLimitPercent / 100
-              : undefined,
+          dailyLossLimitPercent: validated.dailyLossLimitPercent,
         },
       });
 

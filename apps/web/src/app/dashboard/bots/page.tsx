@@ -30,7 +30,7 @@ export default function BotsPage() {
     queryKey: ['bots'],
     queryFn: async () => (await api.bots()).data as BotRow[],
   });
-  const { run, busy, error, clearError } = useBotCommand();
+  const { run, busy, error } = useBotCommand();
   const [confirm, setConfirm] = useState<{ bot: BotRow; command: BotCommand } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 

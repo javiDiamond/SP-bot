@@ -55,7 +55,7 @@ export function gridProfit(
   };
 }
 
-export function spacingInfo(levels: GridPreviewLevel[], gridType: 'ARITHMETIC' | 'GEOMETRIC'): {
+export function spacingInfo(levels: GridPreviewLevel[], _gridType: 'ARITHMETIC' | 'GEOMETRIC'): {
   avgSpacingPct: string;
   minSpacingPct: string;
 } {

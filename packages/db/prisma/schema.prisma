@@ -83,7 +83,7 @@ model Bot {
   // Risk limits
   maxQuoteExposure        Decimal?      @db.Decimal(32, 16)
   maxBaseExposure         Decimal?      @db.Decimal(32, 16)
-  dailyLossLimitPercent   Decimal?      @db.Decimal(5, 4)
+  dailyLossLimitPercent   Decimal?      @db.Decimal(7, 4)
   
   // PnL tracking
   realizedPnL             Decimal       @default(0) @db.Decimal(32, 16)
@@ -481,7 +481,7 @@ model RiskSetting {
   key                       String    @unique
   maxBotsGlobal             Int       @default(10)
   maxBotsPerSymbol          Int       @default(3)
-  maxDailyLossPercent       Decimal   @default(5) @db.Decimal(5, 4)
+  maxDailyLossPercent       Decimal   @default(5) @db.Decimal(7, 4)
   maxQuoteExposureGlobal    Decimal   @default(100000) @db.Decimal(32, 16)
   killSwitchActive          Boolean   @default(false)
   allowLiveTrading          Boolean   @default(false)

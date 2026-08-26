@@ -454,6 +454,14 @@ export class WallexRestClient extends EventEmitter {
   }
 
   /**
+   * Wallex wraps single-entity responses as { message, result, success }
+   * (see docs/spot-create-order.md). Unwrap defensively.
+   */
+  private unwrap<T>(body: any): T {
+    return (body && typeof body === 'object' && 'result' in body ? body.result : body) as T;
+  }
+
+  /**
    * Create order
    * POST /v1/account/orders
    */
@@ -470,14 +478,14 @@ export class WallexRestClient extends EventEmitter {
       }
     }
 
-    const response = await this.request<WallexOrderResponse>({
+    const response = await this.request<any>({
       method: 'POST',
       path: '/v1/account/orders',
       body: order,
       requiresAuth: true,
     });
 
-    return response;
+    return this.unwrap<WallexOrderResponse>(response);
   }
 
   /**
@@ -485,13 +493,13 @@ export class WallexRestClient extends EventEmitter {
    * DELETE /v1/account/orders/{client_id}
    */
   async cancelOrder(clientOrderId: string): Promise<WallexOrderResponse> {
-    const response = await this.request<WallexOrderResponse>({
+    const response = await this.request<any>({
       method: 'DELETE',
       path: `/v1/account/orders/${clientOrderId}`,
       requiresAuth: true,
     });
 
-    return response;
+    return this.unwrap<WallexOrderResponse>(response);
   }
 
   /**
@@ -499,13 +507,13 @@ export class WallexRestClient extends EventEmitter {
    * GET /v1/account/orders/{client_id}
    */
   async getOrder(clientOrderId: string): Promise<WallexOrderResponse> {
-    const response = await this.request<WallexOrderResponse>({
+    const response = await this.request<any>({
       method: 'GET',
       path: `/v1/account/orders/${clientOrderId}`,
       requiresAuth: true,
     });
 
-    return response;
+    return this.unwrap<WallexOrderResponse>(response);
   }
 
   /**

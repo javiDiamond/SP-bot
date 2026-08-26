@@ -10,7 +10,7 @@ packages/db/generated/
 # Monorepo tooling
 .turbo/
 .kilo/
-logs/
+/logs/
 
 # Dependencies
 node_modules/

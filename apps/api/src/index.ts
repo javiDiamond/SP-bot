@@ -5,12 +5,13 @@
  */
 
 import { logger } from '@wallex/shared';
-import { config } from './config.js';
+import { config, assertProductionSecrets } from './config.js';
 import { buildApp } from './app.js';
 import { connectDatabase, disconnectDatabase } from './lib/database.js';
 import { closeQueues } from './lib/queue.js';
 
 async function main() {
+  assertProductionSecrets();
   const fastify = await buildApp();
 
   // Graceful shutdown

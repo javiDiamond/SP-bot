@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
-import { fmtNum } from '../../../lib/format';
 import { Button, Card, CardHeader, ConfirmModal, ErrorBanner, Spinner } from '../../../components/ui';
 import type { SystemStatusData } from '../../../lib/types';
 

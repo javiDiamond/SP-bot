@@ -8,12 +8,21 @@ import dotenv from 'dotenv';
 // Load the repo-root .env (no-op when absent, e.g. in docker where env is injected)
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-export const workerConfig = {
+// Must match the API dev fallback so keys encrypted by the API can be
+// decrypted by the worker during local development.
+const DEV_FALLBACK_ENCRYPTION_KEY =
+  '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+const encryptionKeyIsValid = (key: string): boolean => /^[0-9a-fA-F]{64}$/.test(key);
+
+export const config = {
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
   // Security
-  encryptionKey: process.env.ENCRYPTION_KEY || '',
+  encryptionKey: encryptionKeyIsValid(process.env.ENCRYPTION_KEY || '')
+    ? (process.env.ENCRYPTION_KEY as string)
+    : DEV_FALLBACK_ENCRYPTION_KEY,
 
   // Wallex exchange
   wallexApiBaseUrl: process.env.WALLEX_API_BASE_URL || 'https://api.wallex.ir',
@@ -43,4 +52,7 @@ export const workerConfig = {
   botLockRenewMs: parseInt(process.env.BOT_LOCK_RENEW_SECONDS || '10', 10) * 1000,
 };
 
-export default workerConfig;
+// Back-compat alias
+export const workerConfig = config;
+
+export default config;

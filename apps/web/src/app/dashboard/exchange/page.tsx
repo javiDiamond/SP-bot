@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { fmtDate } from '../../../lib/format';
-import { Button, Card, CardHeader, ConfirmModal, EmptyState, ErrorBanner, Modal, Spinner } from '../../../components/ui';
+import { Button, Card, CardHeader, ConfirmModal, ErrorBanner, Modal, Spinner } from '../../../components/ui';
 import type { ExchangeAccountRow } from '../../../lib/types';
 
 export default function ExchangePage() {
