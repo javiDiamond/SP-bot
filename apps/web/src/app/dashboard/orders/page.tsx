@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, downloadWithAuth } from '../../../lib/api';
 import { fmtDate, fmtNum } from '../../../lib/format';
-import { Button, EmptyState, SideBadge, Spinner } from '../../../components/ui';
+import { Button, Card, EmptyState, PageHeader, SideBadge, Spinner } from '../../../components/ui';
 import type { FillRow, OrderRow } from '../../../lib/types';
 
 type Tab = 'orders' | 'fills';
@@ -55,26 +55,26 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Orders & Fills</h2>
-          <p className="mt-1 text-sm text-gray-500">Order history across all of your bots</p>
-        </div>
-        <Button
-          variant="secondary"
-          onClick={() =>
-            void downloadWithAuth('/api/orders/fills/export.csv', 'fills.csv', {
-              symbol: symbol || undefined,
-            })
-          }
-        >
-          Export fills CSV
-        </Button>
-      </div>
+      <PageHeader
+        title="Orders & Fills"
+        subtitle="Order history across all of your bots"
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() =>
+              void downloadWithAuth('/api/orders/fills/export.csv', 'fills.csv', {
+                symbol: symbol || undefined,
+              })
+            }
+          >
+            Export fills CSV
+          </Button>
+        }
+      />
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="border-b border-gray-200 px-6 flex flex-wrap items-center gap-4">
-          <div className="flex gap-6">
+      <Card>
+        <div className="border-b border-edge px-4 sm:px-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex gap-1">
             {(
               [
                 ['orders', 'Orders'],
@@ -87,17 +87,17 @@ export default function OrdersPage() {
                   setTab(key);
                   setPage(1);
                 }}
-                className={`py-3 text-sm font-medium border-b-2 -mb-px ${
+                className={`px-3 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                   tab === key
-                    ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-ink-dim hover:text-ink'
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <div className="ml-auto flex items-center gap-2 py-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2 py-2">
             <input
               value={symbol}
               onChange={(e) => {
@@ -105,7 +105,7 @@ export default function OrdersPage() {
                 setPage(1);
               }}
               placeholder="Symbol, e.g. BTCUSDT"
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm w-44"
+              className="input !w-44 !py-1.5 !text-sm"
             />
             <select
               value={side}
@@ -113,7 +113,7 @@ export default function OrdersPage() {
                 setSide(e.target.value);
                 setPage(1);
               }}
-              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              className="select !w-auto !py-1.5 !text-sm"
             >
               <option value="">Any side</option>
               <option value="BUY">BUY</option>
@@ -126,7 +126,7 @@ export default function OrdersPage() {
                   setStatus(e.target.value);
                   setPage(1);
                 }}
-                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                className="select !w-auto !py-1.5 !text-sm"
               >
                 <option value="">Any status</option>
                 {['NEW', 'PARTIALLY_FILLED', 'FILLED', 'CANCELED', 'REJECTED'].map((s) => (
@@ -145,35 +145,35 @@ export default function OrdersPage() {
           ) : (ordersQuery.data?.data || []).length === 0 ? (
             <EmptyState message="No orders match the filters." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
                   <tr>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="px-4 py-3">Symbol</th>
-                    <th className="px-4 py-3">Side</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Price</th>
-                    <th className="px-4 py-3 text-right">Qty</th>
-                    <th className="px-4 py-3 text-right">Executed</th>
-                    <th className="px-4 py-3 text-right">Fee</th>
-                    <th className="px-4 py-3">Dry</th>
+                    <th>Created</th>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th className="text-right">Price</th>
+                    <th className="text-right">Qty</th>
+                    <th className="text-right">Executed</th>
+                    <th className="text-right">Fee</th>
+                    <th>Dry</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {(ordersQuery.data?.data || []).map((o) => (
-                    <tr key={o.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-gray-500">{fmtDate(o.createdAt)}</td>
-                      <td className="px-4 py-2 font-medium">{o.symbol}</td>
-                      <td className="px-4 py-2"><SideBadge side={o.side} /></td>
-                      <td className="px-4 py-2">{o.type}</td>
-                      <td className="px-4 py-2">{o.status}</td>
-                      <td className="px-4 py-2 text-right font-mono">{fmtNum(o.price, 8)}</td>
-                      <td className="px-4 py-2 text-right">{fmtNum(o.quantity, 8)}</td>
-                      <td className="px-4 py-2 text-right">{fmtNum(o.executedQty, 8)}</td>
-                      <td className="px-4 py-2 text-right">{fmtNum(o.fee, 8)}</td>
-                      <td className="px-4 py-2">{o.isDryRun ? 'yes' : 'no'}</td>
+                    <tr key={o.id}>
+                      <td className="text-ink-dim">{fmtDate(o.createdAt)}</td>
+                      <td className="font-medium text-ink">{o.symbol}</td>
+                      <td><SideBadge side={o.side} /></td>
+                      <td>{o.type}</td>
+                      <td className="text-ink-dim">{o.status}</td>
+                      <td className="text-right font-mono num">{fmtNum(o.price, 8)}</td>
+                      <td className="text-right num">{fmtNum(o.quantity, 8)}</td>
+                      <td className="text-right num">{fmtNum(o.executedQty, 8)}</td>
+                      <td className="text-right num">{fmtNum(o.fee, 8)}</td>
+                      <td className="text-ink-dim">{o.isDryRun ? 'yes' : 'no'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -187,31 +187,31 @@ export default function OrdersPage() {
           ) : (fillsQuery.data?.data || []).length === 0 ? (
             <EmptyState message="No fills match the filters." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
                   <tr>
-                    <th className="px-4 py-3">Time</th>
-                    <th className="px-4 py-3">Symbol</th>
-                    <th className="px-4 py-3">Side</th>
-                    <th className="px-4 py-3 text-right">Price</th>
-                    <th className="px-4 py-3 text-right">Qty</th>
-                    <th className="px-4 py-3 text-right">Sum</th>
-                    <th className="px-4 py-3 text-right">Fee</th>
-                    <th className="px-4 py-3">Dry</th>
+                    <th>Time</th>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th className="text-right">Price</th>
+                    <th className="text-right">Qty</th>
+                    <th className="text-right">Sum</th>
+                    <th className="text-right">Fee</th>
+                    <th>Dry</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {(fillsQuery.data?.data || []).map((f) => (
-                    <tr key={f.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-gray-500">{fmtDate(f.timestamp)}</td>
-                      <td className="px-4 py-2 font-medium">{f.symbol || f.order?.symbol || '—'}</td>
-                      <td className="px-4 py-2"><SideBadge side={f.isBuyer ? 'BUY' : 'SELL'} /></td>
-                      <td className="px-4 py-2 text-right font-mono">{fmtNum(f.price, 8)}</td>
-                      <td className="px-4 py-2 text-right">{fmtNum(f.quantity, 8)}</td>
-                      <td className="px-4 py-2 text-right">{fmtNum(f.sum, 4)}</td>
-                      <td className="px-4 py-2 text-right">{fmtNum(f.fee, 8)}</td>
-                      <td className="px-4 py-2">{f.isDryRun ? 'yes' : 'no'}</td>
+                    <tr key={f.id}>
+                      <td className="text-ink-dim">{fmtDate(f.timestamp)}</td>
+                      <td className="font-medium text-ink">{f.symbol || f.order?.symbol || '—'}</td>
+                      <td><SideBadge side={f.isBuyer ? 'BUY' : 'SELL'} /></td>
+                      <td className="text-right font-mono num">{fmtNum(f.price, 8)}</td>
+                      <td className="text-right num">{fmtNum(f.quantity, 8)}</td>
+                      <td className="text-right num">{fmtNum(f.sum, 4)}</td>
+                      <td className="text-right num">{fmtNum(f.fee, 8)}</td>
+                      <td className="text-ink-dim">{f.isDryRun ? 'yes' : 'no'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -219,8 +219,8 @@ export default function OrdersPage() {
             </div>
           ))}
 
-        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
-          <span>
+        <div className="px-5 py-3 border-t border-edge flex items-center justify-between text-sm text-ink-dim">
+          <span className="num">
             Page {page} of {totalPages}
           </span>
           <div className="flex gap-2">
@@ -237,7 +237,7 @@ export default function OrdersPage() {
             </Button>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

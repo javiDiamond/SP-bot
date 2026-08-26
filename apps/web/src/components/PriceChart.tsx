@@ -30,14 +30,14 @@ export function PriceChart({
       height,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#374151',
+        textColor: '#5C6879',
       },
       grid: {
-        vertLines: { color: '#f3f4f6' },
-        horzLines: { color: '#f3f4f6' },
+        vertLines: { color: 'rgba(148,163,184,0.07)' },
+        horzLines: { color: 'rgba(148,163,184,0.07)' },
       },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#e5e7eb' },
-      rightPriceScale: { borderColor: '#e5e7eb' },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'rgba(148,163,184,0.15)' },
+      rightPriceScale: { borderColor: 'rgba(148,163,184,0.15)' },
       autoSize: true,
     });
     chartRef.current = chart;
@@ -63,7 +63,7 @@ export function PriceChart({
     for (const lvl of gridLevels) {
       series.createPriceLine({
         price: Number(lvl.price),
-        color: lvl.active ? '#3b82f6' : '#9ca3af',
+        color: lvl.active ? '#2DD4A0' : 'rgba(148,163,184,0.45)',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: false,
@@ -82,7 +82,7 @@ export function PriceChart({
 
   if (candles.length === 0) {
     return (
-      <div className="flex items-center justify-center text-sm text-gray-400" style={{ height }}>
+      <div className="flex items-center justify-center text-sm text-ink-faint" style={{ height }}>
         No candle data yet — ingest candles from the exchange to draw the chart.
       </div>
     );

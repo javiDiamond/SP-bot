@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../../lib/api';
 import { generateGridLevels, gridProfit, spacingInfo } from '../../../../lib/grid';
 import { fmtNum } from '../../../../lib/format';
-import { Button, Card, CardHeader, ErrorBanner } from '../../../../components/ui';
+import { Button, Card, CardHeader, ErrorBanner, Notice, PageHeader } from '../../../../components/ui';
 import type { ExchangeAccountRow, MarketRow } from '../../../../lib/types';
 
 const DEFAULT_FEE = '0.002'; // 0.2% assumed maker/taker for preview
@@ -158,29 +158,36 @@ export default function NewBotPage() {
     }
   };
 
+  const nearestLevelIndex = useMemo(() => {
+    if (!preview || !currentPrice) return null;
+    return preview.levels.reduce(
+      (best, l) =>
+        Number(l.price) <= Number(currentPrice) && Number(l.price) > Number(best.price) ? l : best,
+      preview.levels[0],
+    ).levelIndex;
+  }, [preview, currentPrice]);
+
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Create Grid Bot</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Configure a spot grid strategy. Dry-run bots simulate fills locally; LIVE bots require
-          explicit enablement.
-        </p>
-      </div>
+    <div className="space-y-6 max-w-6xl">
+      <PageHeader
+        title="Create Grid Bot"
+        subtitle="Configure a spot grid strategy. Dry-run bots simulate fills locally; LIVE bots require explicit enablement."
+      />
 
       {error && <ErrorBanner message={error} />}
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-2 space-y-6">
           <Card>
-            <CardHeader title="1. Basics" />
-            <div className="p-6 space-y-4">
+            <CardHeader title="Basics" subtitle="Identity, mode and market" />
+            <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bot name</label>
+                <label htmlFor="bot-name" className="label">Bot name</label>
                 <input
+                  id="bot-name"
                   value={form.name}
                   onChange={(e) => set('name', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input"
                   placeholder="BTCUSDT conservative grid"
                   required
                 />
@@ -188,32 +195,32 @@ export default function NewBotPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Trading mode
-                  </label>
+                  <label htmlFor="bot-mode" className="label">Trading mode</label>
                   <select
+                    id="bot-mode"
                     value={form.mode}
                     onChange={(e) => set('mode', e.target.value as 'DRY_RUN' | 'LIVE')}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="select"
                   >
                     <option value="DRY_RUN">DRY RUN (paper trading)</option>
                     <option value="LIVE">LIVE (real orders)</option>
                   </select>
                   {form.mode === 'LIVE' && (
-                    <p className="mt-1 text-xs text-red-600">
+                    <p className="field-error">
                       Live trading is blocked unless the environment flag, global risk setting, and
                       account live flag are all enabled.
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="bot-account" className="label">
                     Exchange account {form.mode === 'LIVE' ? '(required)' : '(optional)'}
                   </label>
                   <select
+                    id="bot-account"
                     value={form.exchangeAccountId}
                     onChange={(e) => set('exchangeAccountId', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="select"
                   >
                     <option value="">— none —</option>
                     {(accounts || []).map((a) => (
@@ -223,9 +230,9 @@ export default function NewBotPage() {
                     ))}
                   </select>
                   {(accounts || []).length === 0 && (
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="field-hint">
                       No accounts yet.{' '}
-                      <Link href="/dashboard/exchange" className="text-blue-600 hover:underline">
+                      <Link href="/dashboard/exchange" className="link">
                         Add one
                       </Link>{' '}
                       to track balances or trade live.
@@ -235,17 +242,18 @@ export default function NewBotPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Market</label>
+                <label htmlFor="market-filter" className="label">Market</label>
                 <input
+                  id="market-filter"
                   value={symbolQuery}
                   onChange={(e) => setSymbolQuery(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input"
                   placeholder="Filter markets, e.g. BTC or USDT…"
                 />
                 <select
                   value={form.symbol}
                   onChange={(e) => set('symbol', e.target.value)}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input mt-2 font-mono text-xs"
                   size={6}
                 >
                   <option value="">— select market —</option>
@@ -257,7 +265,7 @@ export default function NewBotPage() {
                   ))}
                 </select>
                 {selectedMarket && (
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="field-hint">
                     price precision {selectedMarket.pricePrecision} · amount precision{' '}
                     {selectedMarket.amountPrecision}
                     {selectedMarket.minNotional ? ` · min notional ${fmtNum(selectedMarket.minNotional)}` : ''}
@@ -268,39 +276,42 @@ export default function NewBotPage() {
           </Card>
 
           <Card>
-            <CardHeader title="2. Grid parameters" />
-            <div className="p-6 space-y-4">
+            <CardHeader title="Grid parameters" subtitle="Range, spacing and risk controls" />
+            <div className="p-6 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Grid type</label>
+                  <label htmlFor="grid-type" className="label">Grid type</label>
                   <select
+                    id="grid-type"
                     value={form.gridType}
                     onChange={(e) => set('gridType', e.target.value as 'ARITHMETIC' | 'GEOMETRIC')}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="select"
                   >
                     <option value="ARITHMETIC">Arithmetic (equal spacing)</option>
                     <option value="GEOMETRIC">Geometric (equal %)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Grid count</label>
+                  <label htmlFor="grid-count" className="label">Grid count</label>
                   <input
+                    id="grid-count"
                     type="number"
                     min={2}
                     max={100}
                     value={form.gridCount}
                     onChange={(e) => set('gridCount', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="input num"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="grid-investment" className="label">
                     Investment ({selectedMarket?.quoteAsset || 'quote'})
                   </label>
                   <input
+                    id="grid-investment"
                     value={form.totalInvestmentQuote}
                     onChange={(e) => set('totalInvestmentQuote', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="input num"
                     placeholder="Total quote amount"
                   />
                 </div>
@@ -308,28 +319,30 @@ export default function NewBotPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Lower price</label>
+                  <label htmlFor="lower-price" className="label">Lower price</label>
                   <input
+                    id="lower-price"
                     value={form.lowerPrice}
                     onChange={(e) => set('lowerPrice', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="input num"
                     placeholder="0"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Upper price</label>
+                  <label htmlFor="upper-price" className="label">Upper price</label>
                   <input
+                    id="upper-price"
                     value={form.upperPrice}
                     onChange={(e) => set('upperPrice', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="input num"
                     placeholder="0"
                   />
                 </div>
               </div>
 
               {currentPrice && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  Current price: <strong>{fmtNum(currentPrice, 6)}</strong>
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-edge bg-deep/50 px-4 py-3 text-sm text-ink-dim">
+                  Current price: <strong className="text-ink num">{fmtNum(currentPrice, 6)}</strong>
                   <Button
                     size="sm"
                     variant="secondary"
@@ -341,20 +354,21 @@ export default function NewBotPage() {
                       }
                     }}
                   >
-                    ±5% around price
+                    Use ±5% around price
                   </Button>
                 </div>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Inventory mode</label>
+                  <label htmlFor="inventory-mode" className="label">Inventory mode</label>
                   <select
+                    id="inventory-mode"
                     value={form.inventoryMode}
                     onChange={(e) =>
                       set('inventoryMode', e.target.value as 'EXISTING_ONLY' | 'AUTO_REBALANCE' | 'MANUAL')
                     }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="select"
                   >
                     <option value="AUTO_REBALANCE">Auto rebalance</option>
                     <option value="EXISTING_ONLY">Existing balance only</option>
@@ -362,23 +376,23 @@ export default function NewBotPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Min profit/grid (bps)
-                  </label>
+                  <label htmlFor="min-profit" className="label">Min profit/grid (bps)</label>
                   <input
+                    id="min-profit"
                     type="number"
                     min={0}
                     value={form.minProfitAfterFeesBps}
                     onChange={(e) => set('minProfitAfterFeesBps', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="input num"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">On range exit</label>
+                  <label htmlFor="range-exit" className="label">On range exit</label>
                   <select
+                    id="range-exit"
                     value={form.onRangeExit}
                     onChange={(e) => set('onRangeExit', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="select"
                   >
                     {RANGE_EXIT_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -391,32 +405,34 @@ export default function NewBotPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stop-loss price <span className="text-gray-400">(optional)</span>
+                  <label htmlFor="stop-loss" className="label">
+                    Stop-loss price <span className="normal-case text-ink-faint">(optional)</span>
                   </label>
                   <input
+                    id="stop-loss"
                     value={form.stopLossPrice}
                     onChange={(e) => set('stopLossPrice', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="input num"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Take-profit price <span className="text-gray-400">(optional)</span>
+                  <label htmlFor="take-profit" className="label">
+                    Take-profit price <span className="normal-case text-ink-faint">(optional)</span>
                   </label>
                   <input
+                    id="take-profit"
                     value={form.takeProfitPrice}
                     onChange={(e) => set('takeProfitPrice', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="input num"
                   />
                 </div>
-                <div className="flex items-end pb-1">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                <div className="flex items-end pb-2">
+                  <label className="flex items-center gap-2.5 text-sm text-ink-dim cursor-pointer">
                     <input
                       type="checkbox"
                       checked={form.makerOnly}
                       onChange={(e) => set('makerOnly', e.target.checked)}
-                      className="rounded border-gray-300"
+                      className="h-4 w-4 rounded border-edge-strong bg-deep accent-[#2DD4A0] focus:ring-accent/40"
                     />
                     Maker-only orders
                   </label>
@@ -427,33 +443,33 @@ export default function NewBotPage() {
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader title="Grid preview" />
-            <div className="p-6 space-y-4 text-sm">
+          <Card className="xl:sticky xl:top-24">
+            <CardHeader title="Grid preview" subtitle="Live validation as you type" />
+            <div className="p-5 space-y-4 text-sm">
               {!preview ? (
-                <p className="text-gray-500">
+                <p className="text-ink-faint leading-relaxed">
                   Enter a valid lower price, upper price, and grid count to preview the levels.
                 </p>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-50 rounded p-2">
-                      <p className="text-xs text-gray-500">Levels</p>
-                      <p className="font-semibold">{preview.levels.length}</p>
+                    <div className="rounded-lg bg-deep/60 border border-edge px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-wider text-ink-faint">Levels</p>
+                      <p className="mt-0.5 font-semibold text-ink num">{preview.levels.length}</p>
                     </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <p className="text-xs text-gray-500">Per-grid quote</p>
-                      <p className="font-semibold">{fmtNum(preview.perGrid, 4)}</p>
+                    <div className="rounded-lg bg-deep/60 border border-edge px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-wider text-ink-faint">Per-grid quote</p>
+                      <p className="mt-0.5 font-semibold text-ink num">{fmtNum(preview.perGrid, 4)}</p>
                     </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <p className="text-xs text-gray-500">Avg spacing</p>
-                      <p className="font-semibold">{preview.spacing.avgSpacingPct}%</p>
+                    <div className="rounded-lg bg-deep/60 border border-edge px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-wider text-ink-faint">Avg spacing</p>
+                      <p className="mt-0.5 font-semibold text-ink num">{preview.spacing.avgSpacingPct}%</p>
                     </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <p className="text-xs text-gray-500">Net profit/grid</p>
+                    <div className="rounded-lg bg-deep/60 border border-edge px-3 py-2.5">
+                      <p className="text-[11px] uppercase tracking-wider text-ink-faint">Net profit/grid</p>
                       <p
-                        className={`font-semibold ${
-                          preview.profit?.isProfitable ? 'text-green-600' : 'text-red-600'
+                        className={`mt-0.5 font-semibold num ${
+                          preview.profit?.isProfitable ? 'text-up' : 'text-down'
                         }`}
                       >
                         {preview.profit?.netPct}%
@@ -462,55 +478,49 @@ export default function NewBotPage() {
                   </div>
 
                   {preview.profit && !preview.profit.isProfitable && (
-                    <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded text-red-700">
-                      Grid spacing is smaller than round-trip fees (assumed 0.4%). This grid will
-                      lose money per cycle.
-                    </div>
+                    <ErrorBanner message="Grid spacing is smaller than round-trip fees (assumed 0.4%). This grid will lose money per cycle." />
                   )}
                   {profitTooLow && preview.profit?.isProfitable && (
-                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded text-yellow-700">
-                      Net profit/grid is below your configured minimum of {minProfitBps} bps.
-                    </div>
+                    <Notice tone="warn" message={`Net profit/grid is below your configured minimum of ${minProfitBps} bps.`} />
                   )}
                   {currentPrice &&
                     (Number(currentPrice) < Number(form.lowerPrice) ||
                       Number(currentPrice) > Number(form.upperPrice)) && (
-                      <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded text-blue-700">
-                        Current price is outside the grid range; orders will only be placed once
-                        the price enters the range.
-                      </div>
+                      <Notice
+                        tone="info"
+                        message="Current price is outside the grid range; orders will only be placed once the price enters the range."
+                      />
                     )}
 
-                  <div className="max-h-64 overflow-y-auto border rounded">
-                    <table className="min-w-full text-xs">
-                      <thead className="bg-gray-50 text-left text-gray-500">
+                  <div className="max-h-72 overflow-y-auto rounded-lg border border-edge">
+                    <table className="table !text-xs">
+                      <thead className="sticky top-0 bg-panel">
                         <tr>
-                          <th className="px-3 py-1.5">#</th>
-                          <th className="px-3 py-1.5 text-right">Price</th>
+                          <th>#</th>
+                          <th className="text-right">Price</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody>
                         {[...preview.levels].reverse().map((lvl) => (
                           <tr
                             key={lvl.levelIndex}
                             className={
                               currentPrice &&
                               Number(lvl.price) <= Number(currentPrice) &&
-                              lvl.levelIndex ===
-                                preview.levels.reduce(
-                                  (best, l) =>
-                                    Number(l.price) <= Number(currentPrice) &&
-                                    Number(l.price) > Number(best.price)
-                                      ? l
-                                      : best,
-                                  preview.levels[0],
-                                ).levelIndex
-                                ? 'bg-yellow-50'
+                              lvl.levelIndex === nearestLevelIndex
+                                ? 'bg-accent/[0.08]'
                                 : ''
                             }
                           >
-                            <td className="px-3 py-1">{lvl.levelIndex}</td>
-                            <td className="px-3 py-1 text-right font-mono">{lvl.price}</td>
+                            <td className="text-ink-faint">{lvl.levelIndex}</td>
+                            <td className="text-right font-mono num">
+                              {lvl.price}
+                              {currentPrice &&
+                                Number(lvl.price) <= Number(currentPrice) &&
+                                lvl.levelIndex === nearestLevelIndex && (
+                                  <span className="ml-2 text-[10px] font-semibold uppercase text-accent">nearest</span>
+                                )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -525,10 +535,7 @@ export default function NewBotPage() {
             <Button type="submit" disabled={busy} variant="primary">
               {busy ? 'Creating…' : 'Create bot'}
             </Button>
-            <Link
-              href="/dashboard/bots"
-              className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-            >
+            <Link href="/dashboard/bots" className="btn-secondary btn-md">
               Cancel
             </Link>
           </div>

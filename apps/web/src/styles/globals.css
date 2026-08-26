@@ -2,32 +2,215 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-deep text-ink;
+    background-image:
+      radial-gradient(1200px 600px at 80% -10%, rgba(45, 212, 160, 0.05), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(56, 189, 248, 0.04), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(45, 212, 160, 0.28);
+  }
+
+  /* Slim dark scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.22);
+    border-radius: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Numeric readability for financial values */
+  .num {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+@layer components {
+  /* ---------- Cards ---------- */
+  .card {
+    @apply bg-panel border border-edge rounded-xl shadow-card overflow-hidden;
+  }
+
+  .card-head {
+    @apply px-5 py-4 border-b border-edge flex items-center justify-between gap-3;
+  }
+
+  .card-title {
+    @apply text-sm font-semibold tracking-wide text-ink;
+  }
+
+  .card-subtitle {
+    @apply mt-0.5 text-xs text-ink-faint;
+  }
+
+  /* ---------- Page header ---------- */
+  .page-head {
+    @apply flex flex-wrap items-end justify-between gap-4;
+  }
+
+  .page-title {
+    @apply text-xl font-semibold tracking-tight text-ink;
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm text-ink-dim;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium
+      transition-all duration-150 select-none cursor-pointer
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-deep
+      disabled:opacity-45 disabled:pointer-events-none;
+  }
+
+  .btn-md {
+    @apply px-4 py-2;
+  }
+
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-[#04120C] hover:bg-accent-hover
+      shadow-[0_0_18px_-4px_rgba(45,212,160,0.55)] hover:shadow-[0_0_22px_-4px_rgba(45,212,160,0.7)];
+  }
+
+  .btn-secondary {
+    @apply btn bg-raised text-ink border border-edge-strong hover:bg-overlay hover:border-ink-faint/40;
+  }
+
+  .btn-danger {
+    @apply btn bg-down/90 text-[#2b0707] hover:bg-down;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-dim hover:text-ink hover:bg-white/[0.04];
+  }
+
+  .btn-up {
+    @apply btn bg-up/15 text-up border border-up/25 hover:bg-up/25;
+  }
+
+  /* ---------- Forms ---------- */
+  .label {
+    @apply block text-xs font-medium uppercase tracking-wider text-ink-dim mb-1.5;
+  }
+
+  .input {
+    @apply w-full rounded-lg bg-deep/70 border border-edge-strong px-3 py-2 text-sm text-ink
+      placeholder:text-ink-faint transition-colors
+      focus:outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/25;
+  }
+
+  .select {
+    @apply input appearance-none pr-8 bg-no-repeat cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2397A3B6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-position: right 0.6rem center;
+    background-size: 0.9rem;
+  }
+
+  .field-hint {
+    @apply mt-1.5 text-xs text-ink-faint;
+  }
+
+  .field-error {
+    @apply mt-1.5 text-xs text-down;
+  }
+
+  /* ---------- Tables ---------- */
+  .table-wrap {
+    @apply overflow-x-auto;
+  }
+
+  .table {
+    @apply min-w-full text-sm border-collapse;
+  }
+
+  .table thead th {
+    @apply px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-faint
+      border-b border-edge whitespace-nowrap;
+  }
+
+  .table tbody tr {
+    @apply border-b border-edge/60 transition-colors;
+  }
+
+  .table tbody tr:last-child {
+    @apply border-b-0;
+  }
+
+  .table tbody tr:hover {
+    @apply bg-white/[0.025];
+  }
+
+  .table td {
+    @apply px-4 py-3 align-middle whitespace-nowrap;
+  }
+
+  .table .num,
+  .table td.num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Badges ---------- */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold
+      uppercase tracking-wide ring-1 ring-inset;
+  }
+
+  /* ---------- Misc ---------- */
+  .link {
+    @apply text-accent hover:text-accent-hover transition-colors;
+  }
+
+  .divider {
+    @apply border-t border-edge my-6;
+  }
+
+  .glow-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full;
+  }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  /* Grid-line backdrop motif (brand identity) */
+  .bg-gridlines {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .bg-gridlines-fade {
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 75%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 75%);
+  }
+
+  .text-gradient {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-accent via-[#5CE8BF] to-info;
   }
 }

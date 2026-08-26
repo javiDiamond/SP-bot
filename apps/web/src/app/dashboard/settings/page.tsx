@@ -4,8 +4,17 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
-import { Button, Card, CardHeader, ConfirmModal, ErrorBanner, Spinner } from '../../../components/ui';
+import { Button, Card, CardHeader, ConfirmModal, ErrorBanner, Notice, PageHeader, Spinner } from '../../../components/ui';
 import type { SystemStatusData } from '../../../lib/types';
+
+function ServicePill({ ok, okLabel, badLabel }: { ok: boolean; okLabel: string; badLabel: string }) {
+  return (
+    <span className={`badge ${ok ? 'bg-up/10 text-up ring-up/25' : 'bg-down/10 text-down ring-down/25'}`}>
+      <span className={`glow-dot ${ok ? 'bg-up' : 'bg-down animate-pulse-dot'}`} />
+      {ok ? okLabel : badLabel}
+    </span>
+  );
+}
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -92,76 +101,49 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-        <p className="mt-1 text-sm text-gray-500">Global risk controls and emergency switches</p>
-      </div>
+      <PageHeader title="Settings" subtitle="Global risk controls and emergency switches" />
 
       {error && <ErrorBanner message={error} />}
 
       {!isAdmin && (
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-md text-sm text-blue-700">
-          Read-only view — risk settings and the kill switch require the ADMIN role.
-        </div>
+        <Notice tone="info" message="Read-only view — risk settings and the kill switch require the ADMIN role." />
       )}
 
       {/* System status */}
       <Card>
         <CardHeader title="System status" />
-        <div className="p-6">
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="bg-gray-50 px-4 py-3 rounded-md">
-              <dt className="text-sm font-medium text-gray-500">Database</dt>
-              <dd className="mt-1 text-sm">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    status?.services?.database ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {status?.services?.database ? 'Connected' : 'Down'}
-                </span>
+        <div className="p-5">
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg bg-deep/60 border border-edge px-4 py-3">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Database</dt>
+              <dd className="mt-1.5">
+                <ServicePill ok={Boolean(status?.services?.database)} okLabel="Connected" badLabel="Down" />
               </dd>
             </div>
-            <div className="bg-gray-50 px-4 py-3 rounded-md">
-              <dt className="text-sm font-medium text-gray-500">Redis</dt>
-              <dd className="mt-1 text-sm">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    status?.services?.redis ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {status?.services?.redis ? 'Connected' : 'Down'}
-                </span>
+            <div className="rounded-lg bg-deep/60 border border-edge px-4 py-3">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Redis</dt>
+              <dd className="mt-1.5">
+                <ServicePill ok={Boolean(status?.services?.redis)} okLabel="Connected" badLabel="Down" />
               </dd>
             </div>
-            <div className="bg-gray-50 px-4 py-3 rounded-md">
-              <dt className="text-sm font-medium text-gray-500">Live trading (environment)</dt>
-              <dd className="mt-1 text-sm">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    liveEnv ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                  }`}
-                >
+            <div className="rounded-lg bg-deep/60 border border-edge px-4 py-3">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Live trading (environment)</dt>
+              <dd className="mt-1.5">
+                <span className={`badge ${liveEnv ? 'bg-down/10 text-down ring-down/25' : 'bg-up/10 text-up ring-up/25'}`}>
                   {liveEnv ? 'ENABLE_LIVE_TRADING=true' : 'ENABLE_LIVE_TRADING=false'}
                 </span>
               </dd>
             </div>
-            <div className="bg-gray-50 px-4 py-3 rounded-md">
-              <dt className="text-sm font-medium text-gray-500">Allow live trading (DB)</dt>
-              <dd className="mt-1 text-sm">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    risk?.allowLiveTrading ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                  }`}
-                >
-                  {risk?.allowLiveTrading ? 'Allowed' : 'Blocked'}
-                </span>
+            <div className="rounded-lg bg-deep/60 border border-edge px-4 py-3">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Allow live trading (DB)</dt>
+              <dd className="mt-1.5">
+                <ServicePill ok={!risk?.allowLiveTrading} okLabel="Blocked" badLabel="Allowed" />
               </dd>
             </div>
             {queueDepths && (
-              <div className="bg-gray-50 px-4 py-3 rounded-md sm:col-span-2">
-                <dt className="text-sm font-medium text-gray-500">Queue depths</dt>
-                <dd className="mt-1 text-sm text-gray-700">
+              <div className="rounded-lg bg-deep/60 border border-edge px-4 py-3 sm:col-span-2">
+                <dt className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Queue depths</dt>
+                <dd className="mt-1.5 text-sm text-ink-dim num">
                   {Object.entries(queueDepths)
                     .map(([q, d]) => `${q}: ${d}`)
                     .join(' · ')}
@@ -184,47 +166,49 @@ export default function SettingsPage() {
             )
           }
         />
-        <div className="p-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="p-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Max bots (global)</label>
+            <label htmlFor="risk-maxbots" className="label">Max bots (global)</label>
             <input
+              id="risk-maxbots"
               type="number"
               value={form.maxBotsGlobal}
               disabled={!isAdmin}
               onChange={(e) => setForm((f) => ({ ...f, maxBotsGlobal: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+              className="input num disabled:opacity-50"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Max bots per symbol</label>
+            <label htmlFor="risk-maxbotsymbol" className="label">Max bots per symbol</label>
             <input
+              id="risk-maxbotsymbol"
               type="number"
               value={form.maxBotsPerSymbol}
               disabled={!isAdmin}
               onChange={(e) => setForm((f) => ({ ...f, maxBotsPerSymbol: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+              className="input num disabled:opacity-50"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Max daily loss (%)</label>
+            <label htmlFor="risk-loss" className="label">Max daily loss (%)</label>
             <input
+              id="risk-loss"
               type="number"
               step="0.01"
               value={form.maxDailyLossPercent}
               disabled={!isAdmin}
               onChange={(e) => setForm((f) => ({ ...f, maxDailyLossPercent: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+              className="input num disabled:opacity-50"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Max quote exposure (global)
-            </label>
+            <label htmlFor="risk-exposure" className="label">Max quote exposure (global)</label>
             <input
+              id="risk-exposure"
               value={form.maxQuoteExposureGlobal}
               disabled={!isAdmin}
               onChange={(e) => setForm((f) => ({ ...f, maxQuoteExposureGlobal: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+              className="input num disabled:opacity-50"
             />
           </div>
         </div>
@@ -233,11 +217,11 @@ export default function SettingsPage() {
       {/* Live trading flag */}
       <Card>
         <CardHeader title="Live trading gate" />
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Allow live trading (global flag)</p>
-              <p className="text-sm text-gray-500">
+        <div className="p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="max-w-md">
+              <p className="text-sm font-medium text-ink">Allow live trading (global flag)</p>
+              <p className="mt-1 text-sm text-ink-dim leading-relaxed">
                 Even when allowed here, live bots additionally require ENABLE_LIVE_TRADING=true in
                 the API/worker environment and a live-enabled exchange account.
               </p>
@@ -256,9 +240,12 @@ export default function SettingsPage() {
               {risk?.allowLiveTrading ? 'Disable live trading' : 'Allow live trading'}
             </Button>
           </div>
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-            <p className="text-sm text-red-700">
-              <strong className="font-medium">Risk warning: </strong>
+          <div className="flex items-start gap-3 rounded-lg border border-down/25 bg-down/[0.07] px-4 py-3">
+            <svg className="w-5 h-5 shrink-0 text-down mt-0.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M12 21a9 9 0 100-18 9 9 0 000 18z" />
+            </svg>
+            <p className="text-sm text-down leading-relaxed">
+              <strong className="font-semibold">Risk warning: </strong>
               live trading places real orders with real funds. Grid bots can lose money in trending
               markets. Test thoroughly in dry-run mode first.
             </p>
@@ -267,10 +254,22 @@ export default function SettingsPage() {
       </Card>
 
       {/* Kill switch */}
-      <Card className={killActive ? 'ring-2 ring-red-500' : ''}>
-        <CardHeader title="Emergency kill switch" />
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-gray-600">
+      <Card className={killActive ? 'ring-2 ring-down/60' : ''}>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-2.5">
+              Emergency kill switch
+              {killActive && (
+                <span className="badge bg-down/15 text-down ring-down/30">
+                  <span className="glow-dot bg-down animate-pulse-dot" />
+                  Active
+                </span>
+              )}
+            </span>
+          }
+        />
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-ink-dim leading-relaxed max-w-2xl">
             Activating the kill switch blocks new orders on every bot, commands all running bots to
             stop, and marks them KILLED. It persists until deactivated.
           </p>

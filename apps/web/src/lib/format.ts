@@ -39,8 +39,8 @@ export function fmtTime(iso: string | null | undefined): string {
 
 export function pnlClass(value: string | number | null | undefined): string {
   const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n) || n === 0) return 'text-gray-700';
-  return n > 0 ? 'text-green-600' : 'text-red-600';
+  if (!Number.isFinite(n) || n === 0) return 'text-ink-dim';
+  return n > 0 ? 'text-up' : 'text-down';
 }
 
 export function shortId(id: string): string {

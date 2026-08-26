@@ -8,9 +8,12 @@ import { fmtDate, fmtNum, fmtPnl, fmtTime, pnlClass, shortId } from '../../../..
 import { allowedCommands, useBotCommand, type BotCommand } from '../../../../lib/useBotCommand';
 import {
   Button,
+  Card,
+  CardHeader,
   ConfirmModal,
   EmptyState,
   ErrorBanner,
+  LevelBadge,
   ModeBadge,
   SideBadge,
   Spinner,
@@ -29,6 +32,17 @@ const COMMAND_LABELS: Record<BotCommand, string> = {
 };
 
 type Tab = 'levels' | 'orders' | 'fills' | 'pnl' | 'events';
+
+function LevelStatusBadge({ status }: { status: string }) {
+  const cls = status.includes('BUY')
+    ? 'bg-up/10 text-up ring-up/25'
+    : status.includes('SELL')
+      ? 'bg-down/10 text-down ring-down/25'
+      : status === 'ERROR'
+        ? 'bg-down/15 text-down ring-down/30'
+        : 'bg-white/[0.05] text-ink-dim ring-white/10';
+  return <span className={`badge ${cls}`}>{status.replace(/_/g, ' ')}</span>;
+}
 
 export default function BotDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -63,7 +77,7 @@ export default function BotDetailPage() {
     refetchInterval: 15_000,
   });
 
-  const { run, busy, error: cmdError, clearError } = useBotCommand();
+  const { run, busy, error: cmdError } = useBotCommand();
 
   const ingestCandles = useCallback(async () => {
     if (!bot) return;
@@ -110,17 +124,26 @@ export default function BotDetailPage() {
     active: l.status !== 'IDLE',
   }));
 
+  const stats = [
+    { label: 'Total PnL', value: fmtPnl(totalPnL), cls: pnlClass(totalPnL) },
+    { label: 'Realized', value: fmtPnl(bot.realizedPnL), cls: pnlClass(bot.realizedPnL) },
+    { label: 'Unrealized', value: fmtPnl(bot.unrealizedPnL), cls: pnlClass(bot.unrealizedPnL) },
+    { label: 'Fees paid', value: fmtNum(bot.totalFeesPaid, 4), cls: 'text-ink' },
+    { label: 'Buys / Sells', value: `${bot.totalBuys} / ${bot.totalSells}`, cls: 'text-ink' },
+    { label: 'Grid cycles', value: String(bot.totalGridCycles), cls: 'text-ink' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-gray-900">{bot.name}</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl font-semibold tracking-tight text-ink">{bot.name}</h2>
             <StatusBadge status={bot.status} />
             <ModeBadge mode={bot.mode} />
           </div>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1.5 text-sm text-ink-dim num">
             {bot.symbol} · {config.gridType} · {config.gridCount} grids ·{' '}
             {fmtNum(config.lowerPrice, 6)} – {fmtNum(config.upperPrice, 6)} · created{' '}
             {fmtDate(bot.createdAt)}
@@ -146,58 +169,46 @@ export default function BotDetailPage() {
         </div>
       </div>
 
-      {(cmdError || busy) && (
-        <div
-          className={`border-l-4 p-3 rounded-md text-sm ${
-            cmdError
-              ? 'bg-red-50 border-red-400 text-red-700'
-              : 'bg-blue-50 border-blue-400 text-blue-700'
-          }`}
-        >
-          {cmdError || `Command dispatched: ${busy && COMMAND_LABELS[busy]} — worker is processing…`}
-          {cmdError && (
-            <button onClick={clearError} className="ml-2 underline">
-              dismiss
-            </button>
-          )}
+      {cmdError && <ErrorBanner message={cmdError} />}
+      {busy && !cmdError && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-info/25 bg-info/[0.06] px-4 py-3 text-sm text-info">
+          <span className="h-3.5 w-3.5 rounded-full border-2 border-info/30 border-t-info animate-spin" />
+          Command dispatched: <strong className="font-semibold">{COMMAND_LABELS[busy]}</strong> — worker is processing…
         </div>
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {[
-          { label: 'Total PnL', value: fmtPnl(totalPnL), cls: pnlClass(totalPnL) },
-          { label: 'Realized', value: fmtPnl(bot.realizedPnL), cls: pnlClass(bot.realizedPnL) },
-          { label: 'Unrealized', value: fmtPnl(bot.unrealizedPnL), cls: pnlClass(bot.unrealizedPnL) },
-          { label: 'Fees paid', value: fmtNum(bot.totalFeesPaid, 4), cls: 'text-gray-700' },
-          { label: 'Buys / Sells', value: `${bot.totalBuys} / ${bot.totalSells}`, cls: 'text-gray-700' },
-          { label: 'Grid cycles', value: String(bot.totalGridCycles), cls: 'text-gray-700' },
-        ].map((s) => (
-          <div key={s.label} className="bg-white shadow rounded-lg p-4">
-            <p className="text-xs text-gray-500">{s.label}</p>
-            <p className={`text-lg font-semibold ${s.cls}`}>{s.value}</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        {stats.map((s) => (
+          <div key={s.label} className="card px-4 py-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">{s.label}</p>
+            <p className={`mt-1 text-lg font-semibold num ${s.cls}`}>{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* Price chart */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900">
-            Price & grid levels <span className="text-sm text-gray-400">(1H candles)</span>
-          </h3>
-          <Button size="sm" variant="secondary" onClick={ingestCandles} disabled={ingestBusy}>
-            {ingestBusy ? 'Ingesting…' : 'Load 30d candles from exchange'}
-          </Button>
-        </div>
+      <Card>
+        <CardHeader
+          title={
+            <>
+              Price & grid levels <span className="text-xs font-normal text-ink-faint">(1H candles)</span>
+            </>
+          }
+          actions={
+            <Button size="sm" variant="secondary" onClick={ingestCandles} disabled={ingestBusy}>
+              {ingestBusy ? 'Ingesting…' : 'Load 30d candles from exchange'}
+            </Button>
+          }
+        />
         <div className="p-4">
           <PriceChart candles={(candles || []) as any} gridLevels={gridLevelLines} />
         </div>
-      </div>
+      </Card>
 
       {/* Tabs */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="border-b border-gray-200 px-6 flex gap-6">
+      <Card>
+        <div className="border-b border-edge px-4 sm:px-6 flex gap-1 overflow-x-auto">
           {(
             [
               ['levels', `Grid Levels (${(bot.gridLevels || []).length})`],
@@ -210,10 +221,10 @@ export default function BotDetailPage() {
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`py-3 text-sm font-medium border-b-2 -mb-px ${
+              className={`px-3 py-3 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
                 tab === key
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-ink-dim hover:text-ink'
               }`}
             >
               {label}
@@ -221,44 +232,32 @@ export default function BotDetailPage() {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-5">
           {tab === 'levels' &&
             ((bot.gridLevels || []).length === 0 ? (
               <EmptyState message="No grid levels yet — levels are created when the bot starts." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <th className="px-4 py-2">#</th>
-                      <th className="px-4 py-2 text-right">Price</th>
-                      <th className="px-4 py-2">Status</th>
-                      <th className="px-4 py-2 text-right">Filled qty</th>
-                      <th className="px-4 py-2 text-right">Avg cost</th>
+                      <th>#</th>
+                      <th className="text-right">Price</th>
+                      <th>Status</th>
+                      <th className="text-right">Filled qty</th>
+                      <th className="text-right">Avg cost</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody>
                     {(bot.gridLevels || []).map((lvl) => (
                       <tr key={lvl.id}>
-                        <td className="px-4 py-2 text-gray-500">{lvl.levelIndex}</td>
-                        <td className="px-4 py-2 text-right font-mono">{fmtNum(lvl.price, 8)}</td>
-                        <td className="px-4 py-2">
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                              lvl.status.includes('BUY')
-                                ? 'bg-green-50 text-green-700'
-                                : lvl.status.includes('SELL')
-                                  ? 'bg-red-50 text-red-700'
-                                  : lvl.status === 'ERROR'
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {lvl.status.replace(/_/g, ' ')}
-                          </span>
+                        <td className="text-ink-faint">{lvl.levelIndex}</td>
+                        <td className="text-right font-mono num">{fmtNum(lvl.price, 8)}</td>
+                        <td>
+                          <LevelStatusBadge status={lvl.status} />
                         </td>
-                        <td className="px-4 py-2 text-right">{fmtNum(lvl.filledQuantity, 8)}</td>
-                        <td className="px-4 py-2 text-right">
+                        <td className="text-right num">{fmtNum(lvl.filledQuantity, 8)}</td>
+                        <td className="text-right num">
                           {lvl.averageCost ? fmtNum(lvl.averageCost, 8) : '—'}
                         </td>
                       </tr>
@@ -272,31 +271,31 @@ export default function BotDetailPage() {
             ((bot.orders || []).length === 0 ? (
               <EmptyState message="No orders yet." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <th className="px-4 py-2">Time</th>
-                      <th className="px-4 py-2">Side</th>
-                      <th className="px-4 py-2">Type</th>
-                      <th className="px-4 py-2">Status</th>
-                      <th className="px-4 py-2 text-right">Price</th>
-                      <th className="px-4 py-2 text-right">Qty</th>
-                      <th className="px-4 py-2 text-right">Executed</th>
-                      <th className="px-4 py-2">Client Order ID</th>
+                      <th>Time</th>
+                      <th>Side</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th className="text-right">Price</th>
+                      <th className="text-right">Qty</th>
+                      <th className="text-right">Executed</th>
+                      <th>Client Order ID</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody>
                     {(bot.orders || []).map((o) => (
                       <tr key={o.id}>
-                        <td className="px-4 py-2 text-gray-500">{fmtTime(o.createdAt)}</td>
-                        <td className="px-4 py-2"><SideBadge side={o.side} /></td>
-                        <td className="px-4 py-2">{o.type}</td>
-                        <td className="px-4 py-2">{o.status}</td>
-                        <td className="px-4 py-2 text-right font-mono">{fmtNum(o.price, 8)}</td>
-                        <td className="px-4 py-2 text-right">{fmtNum(o.quantity, 8)}</td>
-                        <td className="px-4 py-2 text-right">{fmtNum(o.executedQty, 8)}</td>
-                        <td className="px-4 py-2 font-mono text-xs text-gray-400">{o.clientOrderId}</td>
+                        <td className="text-ink-dim">{fmtTime(o.createdAt)}</td>
+                        <td><SideBadge side={o.side} /></td>
+                        <td>{o.type}</td>
+                        <td className="text-ink-dim">{o.status}</td>
+                        <td className="text-right font-mono num">{fmtNum(o.price, 8)}</td>
+                        <td className="text-right num">{fmtNum(o.quantity, 8)}</td>
+                        <td className="text-right num">{fmtNum(o.executedQty, 8)}</td>
+                        <td className="font-mono text-xs text-ink-faint">{o.clientOrderId}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -308,31 +307,31 @@ export default function BotDetailPage() {
             ((bot.fills || []).length === 0 ? (
               <EmptyState message="No fills yet." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
                     <tr>
-                      <th className="px-4 py-2">Time</th>
-                      <th className="px-4 py-2">Side</th>
-                      <th className="px-4 py-2 text-right">Price</th>
-                      <th className="px-4 py-2 text-right">Qty</th>
-                      <th className="px-4 py-2 text-right">Sum</th>
-                      <th className="px-4 py-2 text-right">Fee</th>
-                      <th className="px-4 py-2">Dry run</th>
+                      <th>Time</th>
+                      <th>Side</th>
+                      <th className="text-right">Price</th>
+                      <th className="text-right">Qty</th>
+                      <th className="text-right">Sum</th>
+                      <th className="text-right">Fee</th>
+                      <th>Dry run</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody>
                     {(bot.fills || []).map((f) => (
                       <tr key={f.id}>
-                        <td className="px-4 py-2 text-gray-500">{fmtTime(f.timestamp)}</td>
-                        <td className="px-4 py-2">
+                        <td className="text-ink-dim">{fmtTime(f.timestamp)}</td>
+                        <td>
                           <SideBadge side={f.isBuyer ? 'BUY' : 'SELL'} />
                         </td>
-                        <td className="px-4 py-2 text-right font-mono">{fmtNum(f.price, 8)}</td>
-                        <td className="px-4 py-2 text-right">{fmtNum(f.quantity, 8)}</td>
-                        <td className="px-4 py-2 text-right">{fmtNum(f.sum, 4)}</td>
-                        <td className="px-4 py-2 text-right">{fmtNum(f.fee, 6)}</td>
-                        <td className="px-4 py-2">{f.isDryRun ? 'yes' : 'no'}</td>
+                        <td className="text-right font-mono num">{fmtNum(f.price, 8)}</td>
+                        <td className="text-right num">{fmtNum(f.quantity, 8)}</td>
+                        <td className="text-right num">{fmtNum(f.sum, 4)}</td>
+                        <td className="text-right num">{fmtNum(f.fee, 6)}</td>
+                        <td className="text-ink-dim">{f.isDryRun ? 'yes' : 'no'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -340,31 +339,21 @@ export default function BotDetailPage() {
               </div>
             ))}
 
-          {tab === 'pnl' && (
-            <EquityChart points={pnlPoints} label="Total PnL" />
-          )}
+          {tab === 'pnl' && <EquityChart points={pnlPoints} label="Total PnL" />}
 
           {tab === 'events' &&
             ((botEvents || []).length === 0 ? (
               <EmptyState message="No events for this bot yet." />
             ) : (
-              <ul className="divide-y divide-gray-200 text-sm">
+              <ul className="divide-y divide-edge text-sm">
                 {(botEvents || []).map((e) => (
-                  <li key={e.id} className="py-2.5 flex items-start gap-3">
-                    <span
-                      className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${
-                        e.level === 'ERROR'
-                          ? 'bg-red-100 text-red-700'
-                          : e.level === 'WARN'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-blue-100 text-blue-700'
-                      }`}
-                    >
-                      {e.level}
-                    </span>
+                  <li key={e.id} className="py-3 flex items-start gap-3">
+                    <div className="mt-0.5 shrink-0">
+                      <LevelBadge level={e.level} />
+                    </div>
                     <div className="min-w-0">
-                      <p className="text-gray-800">{e.message}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-ink">{e.message}</p>
+                      <p className="text-xs text-ink-faint mt-0.5">
                         {e.event} · {fmtDate(e.createdAt)}
                       </p>
                     </div>
@@ -373,9 +362,9 @@ export default function BotDetailPage() {
               </ul>
             ))}
         </div>
-      </div>
+      </Card>
 
-      <div className="text-xs text-gray-400">
+      <div className="text-xs text-ink-faint font-mono">
         Bot ID {shortId(bot.id)} {bot.exchangeAccountId ? `· account ${shortId(bot.exchangeAccountId)}` : ''}
       </div>
 

@@ -23,7 +23,7 @@ export function EquityChart({
 }) {
   if (points.length === 0) {
     return (
-      <div className="flex items-center justify-center text-sm text-gray-400" style={{ height }}>
+      <div className="flex items-center justify-center text-sm text-ink-faint" style={{ height }}>
         No snapshot data yet — PnL snapshots are recorded while the bot runs.
       </div>
     );
@@ -46,21 +46,29 @@ export function EquityChart({
       <AreaChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+            <stop offset="5%" stopColor="#2DD4A0" stopOpacity={0.28} />
+            <stop offset="95%" stopColor="#2DD4A0" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="t" tick={{ fontSize: 11 }} minTickGap={40} />
-        <YAxis tick={{ fontSize: 11 }} width={70} />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.10)" />
+        <XAxis dataKey="t" tick={{ fontSize: 11, fill: '#5C6879' }} minTickGap={40} />
+        <YAxis tick={{ fontSize: 11, fill: '#5C6879' }} width={70} />
         <Tooltip
           formatter={(value: any) => [Number(value).toFixed(4), label]}
-          contentStyle={{ fontSize: 12 }}
+          contentStyle={{
+            fontSize: 12,
+            background: '#131B27',
+            border: '1px solid rgba(148,163,184,0.18)',
+            borderRadius: 8,
+            color: '#E8EDF5',
+          }}
+          labelStyle={{ color: '#97A3B6' }}
+          itemStyle={{ color: '#E8EDF5' }}
         />
         <Area
           type="monotone"
           dataKey={valueKey}
-          stroke="#3b82f6"
+          stroke="#2DD4A0"
           strokeWidth={2}
           fill="url(#equityGradient)"
         />

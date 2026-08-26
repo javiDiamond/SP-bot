@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { fmtDate } from '../../../lib/format';
-import { Button, EmptyState, ErrorBanner, Spinner } from '../../../components/ui';
+import { Button, Card, CardHeader, EmptyState, ErrorBanner, PageHeader, Spinner } from '../../../components/ui';
 import type { BacktestRow, MarketRow } from '../../../lib/types';
-import { useRouter } from 'next/navigation';
 
 const RESOLUTIONS = [
   { value: '1', label: '1 minute' },
@@ -18,15 +18,17 @@ const RESOLUTIONS = [
   { value: '1D', label: '1 day' },
 ];
 
+const STATUS_CHIP: Record<string, string> = {
+  PENDING: 'bg-white/[0.05] text-ink-dim ring-white/10',
+  RUNNING: 'bg-info/10 text-info ring-info/25',
+  COMPLETED: 'bg-up/10 text-up ring-up/25',
+  FAILED: 'bg-down/10 text-down ring-down/25',
+};
+
 function statusChip(status: string) {
-  const map: Record<string, string> = {
-    PENDING: 'bg-gray-100 text-gray-600',
-    RUNNING: 'bg-blue-50 text-blue-700',
-    COMPLETED: 'bg-green-50 text-green-700',
-    FAILED: 'bg-red-50 text-red-700',
-  };
   return (
-    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${map[status] || map.PENDING}`}>
+    <span className={`badge ${STATUS_CHIP[status] || STATUS_CHIP.PENDING}`}>
+      {status === 'RUNNING' && <span className="glow-dot bg-info animate-pulse-dot" />}
       {status}
     </span>
   );
@@ -132,51 +134,48 @@ export default function BacktestsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Backtests</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Run grid strategies on historical candles. Missing candle data is fetched from Wallex
-            automatically when a run starts.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {selected.length >= 2 && (
-            <Button variant="secondary" onClick={compare}>
-              Compare ({selected.length})
+      <PageHeader
+        title="Backtests"
+        subtitle="Run grid strategies on historical candles. Missing candle data is fetched from Wallex automatically when a run starts."
+        actions={
+          <>
+            {selected.length >= 2 && (
+              <Button variant="secondary" onClick={compare}>
+                Compare ({selected.length})
+              </Button>
+            )}
+            <Button onClick={() => setShowForm((v) => !v)}>
+              {showForm ? 'Close form' : 'New backtest'}
             </Button>
-          )}
-          <Button onClick={() => setShowForm((v) => !v)}>
-            {showForm ? 'Close form' : 'New backtest'}
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {error && <ErrorBanner message={error} />}
 
       {showForm && (
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">New backtest</h3>
-          </div>
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <Card>
+          <CardHeader title="New backtest" subtitle="Simulation parameters and fee assumptions" />
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
             {formError && <ErrorBanner message={formError} />}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label htmlFor="bt-name" className="label">Name</label>
                 <input
+                  id="bt-name"
                   value={form.name}
                   onChange={(e) => set('name', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Market</label>
+                <label htmlFor="bt-symbol" className="label">Market</label>
                 <select
+                  id="bt-symbol"
                   value={form.symbol}
                   onChange={(e) => set('symbol', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="select"
                 >
                   <option value="">— select —</option>
                   {(markets || [])
@@ -189,11 +188,12 @@ export default function BacktestsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Resolution</label>
+                <label htmlFor="bt-res" className="label">Resolution</label>
                 <select
+                  id="bt-res"
                   value={form.resolution}
                   onChange={(e) => set('resolution', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="select"
                 >
                   {RESOLUTIONS.map((r) => (
                     <option key={r.value} value={r.value}>
@@ -206,22 +206,24 @@ export default function BacktestsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+                <label htmlFor="bt-from" className="label">From</label>
                 <input
+                  id="bt-from"
                   type="datetime-local"
                   value={form.dateFrom}
                   onChange={(e) => set('dateFrom', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+                <label htmlFor="bt-to" className="label">To</label>
                 <input
+                  id="bt-to"
                   type="datetime-local"
                   value={form.dateTo}
                   onChange={(e) => set('dateTo', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input"
                   required
                 />
               </div>
@@ -229,79 +231,86 @@ export default function BacktestsPage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Grid type</label>
+                <label htmlFor="bt-gridtype" className="label">Grid type</label>
                 <select
+                  id="bt-gridtype"
                   value={form.gridType}
                   onChange={(e) => set('gridType', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="select"
                 >
                   <option value="ARITHMETIC">Arithmetic</option>
                   <option value="GEOMETRIC">Geometric</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Lower price</label>
+                <label htmlFor="bt-lower" className="label">Lower price</label>
                 <input
+                  id="bt-lower"
                   value={form.lowerPrice}
                   onChange={(e) => set('lowerPrice', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input num"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Upper price</label>
+                <label htmlFor="bt-upper" className="label">Upper price</label>
                 <input
+                  id="bt-upper"
                   value={form.upperPrice}
                   onChange={(e) => set('upperPrice', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input num"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Grids</label>
+                <label htmlFor="bt-count" className="label">Grids</label>
                 <input
+                  id="bt-count"
                   type="number"
                   min={2}
                   value={form.gridCount}
                   onChange={(e) => set('gridCount', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input num"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Investment</label>
+                <label htmlFor="bt-invest" className="label">Investment</label>
                 <input
+                  id="bt-invest"
                   value={form.totalInvestmentQuote}
                   onChange={(e) => set('totalInvestmentQuote', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input num"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-end">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Maker fee</label>
+                <label htmlFor="bt-makerfee" className="label">Maker fee</label>
                 <input
+                  id="bt-makerfee"
                   value={form.makerFee}
                   onChange={(e) => set('makerFee', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input num"
                   placeholder="0.001"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Taker fee</label>
+                <label htmlFor="bt-takerfee" className="label">Taker fee</label>
                 <input
+                  id="bt-takerfee"
                   value={form.takerFee}
                   onChange={(e) => set('takerFee', e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="input num"
                   placeholder="0.001"
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-700 pb-2">
+              <label className="flex items-center gap-2.5 text-sm text-ink-dim pb-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={form.makerOnly}
                   onChange={(e) => set('makerOnly', e.target.checked)}
-                  className="rounded border-gray-300"
+                  className="h-4 w-4 rounded border-edge-strong bg-deep accent-[#2DD4A0] focus:ring-accent/40"
                 />
                 Maker-only fills
               </label>
@@ -309,87 +318,84 @@ export default function BacktestsPage() {
                 {busy ? 'Submitting…' : 'Run backtest'}
               </Button>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="field-hint">
               If candles for this market/resolution/window haven’t been ingested yet, the worker
               fetches them from Wallex automatically before running the simulation.
             </p>
           </form>
-        </div>
+        </Card>
       )}
 
-      <div className="bg-white shadow rounded-lg">
+      <Card>
         {isLoading ? (
           <Spinner />
         ) : (backtests || []).length === 0 ? (
           <EmptyState message="No backtests yet. Create one to evaluate a grid strategy." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3 w-8"></th>
-                  <th className="px-6 py-3">Name</th>
-                  <th className="px-6 py-3">Symbol</th>
-                  <th className="px-6 py-3">Range</th>
-                  <th className="px-6 py-3">Res</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Trades</th>
-                  <th className="px-6 py-3 text-right">Total PnL</th>
-                  <th className="px-6 py-3 text-right">vs B&H</th>
-                  <th className="px-6 py-3">Created</th>
+                  <th className="w-8"></th>
+                  <th>Name</th>
+                  <th>Symbol</th>
+                  <th>Range</th>
+                  <th>Res</th>
+                  <th>Status</th>
+                  <th className="text-right">Trades</th>
+                  <th className="text-right">Total PnL</th>
+                  <th className="text-right">vs B&H</th>
+                  <th>Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody>
                 {(backtests || []).map((bt) => {
                   const m = bt.results?.metrics;
                   const gridPct = m ? Number(m.gridProfitPct) : null;
                   const bhPct = m ? Number(m.buyAndHoldPct) : null;
                   const diff = gridPct !== null && bhPct !== null ? gridPct - bhPct : null;
                   return (
-                    <tr key={bt.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-3">
+                    <tr key={bt.id}>
+                      <td>
                         <input
                           type="checkbox"
                           checked={selected.includes(bt.id)}
                           onChange={() => toggleSelected(bt.id)}
                           disabled={bt.status !== 'COMPLETED' && !selected.includes(bt.id)}
-                          className="rounded border-gray-300"
+                          className="h-4 w-4 rounded border-edge-strong bg-deep accent-[#2DD4A0] focus:ring-accent/40"
                         />
                       </td>
-                      <td className="px-6 py-3">
-                        <Link
-                          href={`/dashboard/backtests/${bt.id}`}
-                          className="text-blue-600 hover:underline font-medium"
-                        >
+                      <td>
+                        <Link href={`/dashboard/backtests/${bt.id}`} className="link font-medium">
                           {bt.name}
                         </Link>
                       </td>
-                      <td className="px-6 py-3 font-medium">{bt.symbol}</td>
-                      <td className="px-6 py-3 text-xs text-gray-500">
+                      <td className="font-medium text-ink">{bt.symbol}</td>
+                      <td className="text-xs text-ink-dim">
                         {fmtDate(bt.dateFrom)} → {fmtDate(bt.dateTo)}
                       </td>
-                      <td className="px-6 py-3">{bt.resolution}</td>
-                      <td className="px-6 py-3">{statusChip(bt.status)}</td>
-                      <td className="px-6 py-3 text-right">{bt.tradeCount ?? '—'}</td>
+                      <td>{bt.resolution}</td>
+                      <td>{statusChip(bt.status)}</td>
+                      <td className="text-right num">{bt.tradeCount ?? '—'}</td>
                       <td
-                        className={`px-6 py-3 text-right font-medium ${
+                        className={`text-right font-medium num ${
                           m && Number(m.totalPnL) > 0
-                            ? 'text-green-600'
+                            ? 'text-up'
                             : m && Number(m.totalPnL) < 0
-                              ? 'text-red-600'
+                              ? 'text-down'
                               : ''
                         }`}
                       >
                         {m ? Number(m.totalPnL).toFixed(4) : '—'}
                       </td>
                       <td
-                        className={`px-6 py-3 text-right ${
-                          diff !== null ? (diff >= 0 ? 'text-green-600' : 'text-red-600') : ''
+                        className={`text-right num ${
+                          diff !== null ? (diff >= 0 ? 'text-up' : 'text-down') : ''
                         }`}
                       >
                         {diff !== null ? `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%` : '—'}
                       </td>
-                      <td className="px-6 py-3 text-gray-500">{fmtDate(bt.createdAt)}</td>
+                      <td className="text-ink-dim">{fmtDate(bt.createdAt)}</td>
                     </tr>
                   );
                 })}
@@ -397,7 +403,7 @@ export default function BacktestsPage() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

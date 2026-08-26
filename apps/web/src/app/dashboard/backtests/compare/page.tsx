@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Suspense } from 'react';
 import { api } from '../../../../lib/api';
 import { fmtDate, fmtNum } from '../../../../lib/format';
-import { ErrorBanner, Spinner } from '../../../../components/ui';
+import { Card, ErrorBanner, PageHeader, Spinner } from '../../../../components/ui';
 
 interface CompareRow {
   id: string;
@@ -51,7 +51,7 @@ function CompareContent() {
     return (
       <div className="space-y-4">
         <ErrorBanner message="Provide at least 2 backtest ids. Select rows on the backtests list, then click Compare." />
-        <Link href="/dashboard/backtests" className="text-sm text-blue-600 hover:underline">
+        <Link href="/dashboard/backtests" className="link text-sm">
           ← Back to backtests
         </Link>
       </div>
@@ -79,41 +79,38 @@ function CompareContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Backtest Comparison</h2>
-          <p className="mt-1 text-sm text-gray-500">{rows.length} runs side by side</p>
-        </div>
-        <Link
-          href="/dashboard/backtests"
-          className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-        >
-          ← All backtests
-        </Link>
-      </div>
+      <PageHeader
+        title="Backtest Comparison"
+        subtitle={`${rows.length} runs side by side`}
+        actions={
+          <Link href="/dashboard/backtests" className="btn-secondary btn-md">
+            ← All backtests
+          </Link>
+        }
+      />
 
-      <div className="bg-white shadow rounded-lg overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+      <Card className="table-wrap">
+        <table className="table">
+          <thead>
             <tr>
-              <th className="px-6 py-3">Metric</th>
+              <th>Metric</th>
               {rows.map((r) => (
-                <th key={r.id} className="px-6 py-3">
-                  <Link href={`/dashboard/backtests/${r.id}`} className="text-blue-600 hover:underline">
+                <th key={r.id}>
+                  <Link href={`/dashboard/backtests/${r.id}`} className="link normal-case text-xs">
                     {r.name}
                   </Link>
-                  <div className="font-normal normal-case text-gray-400 mt-0.5">
+                  <div className="font-normal normal-case text-ink-faint mt-1">
                     {r.symbol} · {r.resolution} · {fmtDate(r.dateFrom)} → {fmtDate(r.dateTo)}
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody>
             <tr>
-              <td className="px-6 py-3 text-gray-500">Status</td>
+              <td className="text-ink-faint">Status</td>
               {rows.map((r) => (
-                <td key={r.id} className="px-6 py-3">
+                <td key={r.id} className="text-ink-dim">
                   {r.status} · {r.tradeCount} trades
                 </td>
               ))}
@@ -122,16 +119,16 @@ function CompareContent() {
               const bi = bestIndex(key, betterHigh);
               return (
                 <tr key={key}>
-                  <td className="px-6 py-3 text-gray-500">{label}</td>
+                  <td className="text-ink-faint">{label}</td>
                   {rows.map((r, i) => {
                     const raw = r.results?.metrics?.[key];
                     const val = raw === undefined ? null : Number(raw);
                     return (
                       <td
                         key={r.id}
-                        className={`px-6 py-3 ${
+                        className={`num ${
                           i === bi && rows.length > 1 && val !== null
-                            ? 'font-semibold text-green-700 bg-green-50'
+                            ? 'font-semibold text-up bg-up/[0.07]'
                             : ''
                         }`}
                       >
@@ -144,8 +141,8 @@ function CompareContent() {
             })}
           </tbody>
         </table>
-      </div>
-      <p className="text-xs text-gray-400">
+      </Card>
+      <p className="text-xs text-ink-faint">
         Highlighted cells mark the best value per row (green is better).
       </p>
     </div>

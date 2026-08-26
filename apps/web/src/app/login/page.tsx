@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../lib/store';
 import { getToken } from '../../lib/api';
+import { BrandMark } from '../../components/ui';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,59 +33,84 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Wallex Grid Bot</h1>
-          <p className="mt-2 text-sm text-gray-500">Sign in to your dashboard</p>
+    <div className="relative min-h-screen flex items-center justify-center px-4 py-12 overflow-hidden">
+      <div className="absolute inset-0 bg-gridlines bg-gridlines-fade" aria-hidden />
+      <div
+        className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(45,212,160,0.10), transparent 65%)' }}
+        aria-hidden
+      />
+
+      <div className="relative max-w-md w-full">
+        <div className="flex flex-col items-center mb-8">
+          <BrandMark size={44} />
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-ink">
+            Welcome back
+          </h1>
+          <p className="mt-1.5 text-sm text-ink-dim">Sign in to manage your grid trading bots</p>
         </div>
 
-        <div className="bg-white shadow rounded-lg p-8">
+        <div className="card shadow-pop p-7">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded-md">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="flex items-start gap-2.5 rounded-lg border border-down/25 bg-down/[0.07] px-3.5 py-3">
+                <svg className="w-4 h-4 shrink-0 text-down mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M12 21a9 9 0 100-18 9 9 0 000 18z" />
+                </svg>
+                <p className="text-sm text-down">{error}</p>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label htmlFor="email" className="label">Email</label>
               <input
+                id="email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 placeholder="admin@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label htmlFor="password" className="label">Password</label>
               <input
+                id="password"
                 type="password"
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 placeholder="••••••••"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-            >
-              {busy ? 'Signing in…' : 'Sign in'}
+            <button type="submit" disabled={busy} className="btn-primary btn-md w-full">
+              {busy ? (
+                <>
+                  <span className="h-4 w-4 rounded-full border-2 border-[#04120C]/30 border-t-[#04120C] animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                'Sign in'
+              )}
             </button>
           </form>
         </div>
 
-        <p className="mt-4 text-center text-xs text-gray-400">
-          Default credentials come from the database seed. Live trading is disabled unless
-          explicitly enabled.
-        </p>
+        <div className="mt-6 flex items-start gap-2.5 rounded-lg border border-edge bg-panel/60 px-4 py-3">
+          <svg className="w-4 h-4 shrink-0 text-ink-faint mt-0.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <p className="text-xs leading-relaxed text-ink-faint">
+            Credentials come from the database seed. Live trading stays disabled until explicitly
+            enabled — bots run in dry-run mode by default.
+          </p>
+        </div>
       </div>
     </div>
   );

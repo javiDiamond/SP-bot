@@ -4,7 +4,17 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { fmtDate } from '../../../lib/format';
-import { Button, Card, CardHeader, ConfirmModal, ErrorBanner, Modal, Spinner } from '../../../components/ui';
+import {
+  Button,
+  Card,
+  CardHeader,
+  ConfirmModal,
+  EmptyState,
+  ErrorBanner,
+  Modal,
+  PageHeader,
+  Spinner,
+} from '../../../components/ui';
 import type { ExchangeAccountRow } from '../../../lib/types';
 
 export default function ExchangePage() {
@@ -81,28 +91,25 @@ export default function ExchangePage() {
     }
   };
 
+  const openAdd = () => {
+    setForm({ name: '', apiKey: '', subAccountClientId: '' });
+    setShowAdd(true);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Exchange Accounts</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Wallex API credentials — encrypted at rest, masked everywhere.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            setForm({ name: '', apiKey: '', subAccountClientId: '' });
-            setShowAdd(true);
-          }}
-        >
-          Add Exchange Account
-        </Button>
-      </div>
+      <PageHeader
+        title="Exchange Accounts"
+        subtitle="Wallex API credentials — encrypted at rest, masked everywhere."
+        actions={<Button onClick={openAdd}>Add Exchange Account</Button>}
+      />
 
-      <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-        <p className="text-sm text-red-700">
-          <strong className="font-medium">Security Notice: </strong>
+      <div className="flex items-start gap-3 rounded-lg border border-down/25 bg-down/[0.07] px-4 py-3">
+        <svg className="w-5 h-5 shrink-0 text-down mt-0.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M12 3l9 16H3l9-16z" />
+        </svg>
+        <p className="text-sm text-down leading-relaxed">
+          <strong className="font-semibold">Security Notice: </strong>
           create API keys with only Read and Trade permissions. <strong>Do NOT</strong> enable
           withdrawal permissions. Keys are stored encrypted (AES-256-GCM) and never logged.
         </p>
@@ -114,58 +121,49 @@ export default function ExchangePage() {
         <Spinner />
       ) : (accounts || []).length === 0 ? (
         <Card>
-          <div className="px-6 py-12 text-center">
-            <h3 className="text-sm font-medium text-gray-900">No exchange account configured</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Add your Wallex API credentials to enable live trading or balance snapshots.
-            </p>
-            <div className="mt-6">
-              <Button
-                onClick={() => {
-                  setForm({ name: '', apiKey: '', subAccountClientId: '' });
-                  setShowAdd(true);
-                }}
-              >
-                Add Exchange Account
-              </Button>
-            </div>
-          </div>
+          <EmptyState
+            message="No exchange account configured. Add your Wallex API credentials to enable live trading or balance snapshots."
+            action={<Button onClick={openAdd}>Add Exchange Account</Button>}
+          />
         </Card>
       ) : (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3">Name</th>
-                  <th className="px-6 py-3">API Key</th>
-                  <th className="px-6 py-3">Sub-account</th>
-                  <th className="px-6 py-3">Live enabled</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Created</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
+                  <th>Name</th>
+                  <th>API Key</th>
+                  <th>Sub-account</th>
+                  <th>Live enabled</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody>
                 {(accounts || []).map((a) => (
-                  <tr key={a.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 font-medium">{a.name}</td>
-                    <td className="px-6 py-3 font-mono text-xs">{a.apiKeyMasked}</td>
-                    <td className="px-6 py-3">{a.subAccountClientId || '—'}</td>
-                    <td className="px-6 py-3">
+                  <tr key={a.id}>
+                    <td className="font-medium text-ink">{a.name}</td>
+                    <td className="font-mono text-xs text-ink-dim">{a.apiKeyMasked}</td>
+                    <td>{a.subAccountClientId || '—'}</td>
+                    <td>
                       {a.isLiveEnabled ? (
-                        <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">
-                          LIVE
+                        <span className="badge bg-down/10 text-down ring-down/25">
+                          <span className="glow-dot bg-down animate-pulse-dot" />
+                          Live
                         </span>
                       ) : (
-                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
-                          dry-run only
-                        </span>
+                        <span className="badge bg-white/[0.05] text-ink-dim ring-white/10">dry-run only</span>
                       )}
                     </td>
-                    <td className="px-6 py-3">{a.isActive ? 'active' : 'inactive'}</td>
-                    <td className="px-6 py-3 text-gray-500">{fmtDate(a.createdAt)}</td>
-                    <td className="px-6 py-3">
+                    <td>
+                      <span className={a.isActive ? 'text-up' : 'text-ink-faint'}>
+                        {a.isActive ? 'active' : 'inactive'}
+                      </span>
+                    </td>
+                    <td className="text-ink-dim">{fmtDate(a.createdAt)}</td>
+                    <td>
                       <div className="flex justify-end gap-1.5">
                         <Button
                           size="sm"
@@ -193,15 +191,22 @@ export default function ExchangePage() {
       <Card>
         <CardHeader title="How to get your Wallex API key" />
         <div className="p-6">
-          <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-            <li>Log in to your Wallex Exchange account</li>
-            <li>Navigate to Settings → API Management</li>
-            <li>Click “Create New API Key”</li>
-            <li>Enable only <strong>Read</strong> and <strong>Trade</strong> permissions</li>
-            <li>
-              <strong className="text-red-600">DO NOT</strong> enable Withdrawal permissions
-            </li>
-            <li>Copy the API key and add it above</li>
+          <ol className="space-y-2.5 text-sm text-ink-dim">
+            {[
+              <>Log in to your Wallex Exchange account</>,
+              <>Navigate to Settings → API Management</>,
+              <>Click “Create New API Key”</>,
+              <>Enable only <strong className="text-ink">Read</strong> and <strong className="text-ink">Trade</strong> permissions</>,
+              <><strong className="text-down font-semibold">DO NOT</strong> enable Withdrawal permissions</>,
+              <>Copy the API key and add it above</>,
+            ].map((item, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-accent/12 ring-1 ring-accent/25 text-accent text-[11px] font-semibold flex items-center justify-center num">
+                  {i + 1}
+                </span>
+                <span className="leading-6">{item}</span>
+              </li>
+            ))}
           </ol>
         </div>
       </Card>
@@ -218,40 +223,43 @@ export default function ExchangePage() {
         <form onSubmit={editAccount ? handleEdit : handleAdd} className="space-y-4">
           {error && <ErrorBanner message={error} />}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Account name</label>
+            <label htmlFor="acc-name" className="label">Account name</label>
             <input
+              id="acc-name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="input"
               placeholder="Main Wallex account"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              API key {editAccount && <span className="text-gray-400">(leave blank to keep current)</span>}
+            <label htmlFor="acc-key" className="label">
+              API key {editAccount && <span className="normal-case text-ink-faint">(leave blank to keep current)</span>}
             </label>
             <input
+              id="acc-key"
               type="password"
               value={form.apiKey}
               onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="input font-mono"
               placeholder={editAccount ? '••••••••' : 'Paste your Wallex API key'}
               autoComplete="off"
             />
             {!editAccount && (
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="field-hint">
                 Stored encrypted; displayed masked. Never logged or sent anywhere else.
               </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sub-account client ID <span className="text-gray-400">(optional)</span>
+            <label htmlFor="acc-sub" className="label">
+              Sub-account client ID <span className="normal-case text-ink-faint">(optional)</span>
             </label>
             <input
+              id="acc-sub"
               value={form.subAccountClientId}
               onChange={(e) => setForm((f) => ({ ...f, subAccountClientId: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="input"
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">
